@@ -1,20 +1,30 @@
-Activity Diagrams for User Authentication and Transaction Handling
+<h1>Activity Diagrams for User Authentication and Transaction Handling</h1>
 
-Purpose
+<h2>Purpose</h2>
 
-These activity diagrams illustrate the workflows for user authentication and transaction handling within RevoBank's web-based application. They serve as blueprints to guide the development team in implementing these functionalities efficiently.
+These activity diagrams illustrate the workflows for user authentication and transaction handling within RevoBank's web-based application. They serve as blueprints to guide the development team in implementing these functionalities efficiently. This workflow is inspired by paypal. 
 
-UML Compliance
+The diagrams follow UML standards, including action states, decision nodes, and transitions. Decision nodes are represented for error handling and verification steps. These diagrams provide a structured visualization of authentication and transaction workflows, ensuring secure and efficient banking processes within RevoBank.
 
-The diagrams follow UML standards, including action states, decision nodes, and transitions.
+To access the diagram: 
 
-Decision nodes are represented for error handling and verification steps.
+``
+## Installation Instructions
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/revou-fsse-oct24/milestone-3-rifqisaleh.git
+   ```
+2. Navigate to the project directory:
+   ```bash
+   cd Revoubank-Project
+   ```
+3. Open UML Diagram inside within the directory
 
-These diagrams provide a structured visualization of authentication and transaction workflows, ensuring secure and efficient banking processes within RevoBank.
 
 
+<br>
 
-1. User Authentication Activity Diagram
+<h3> 1. User Authentication Activity Diagram </h3>
 
 Description:
 This diagram outlines the login process, including credential verification, error handling, email notifications, and token generation.
@@ -37,26 +47,31 @@ Actors:
 
 * Authentication Service
 
-* Email Notification
+* Email Notification<br> <br>
+<br> <br>
 
 
 
-2. Transaction Handling Activity Diagram
+<h3> 2. Transaction Handling Activity Diagram </h3>
 
 Description:
 This diagram depicts the process of handling transactions, including deposits, withdrawals, and transfers.
 
 Key Processes:
 
-* The user initiates a transaction.
+* The user accesses the account overview page and initiates a transaction.
 
 * The system verifies account balance.
 
-* If the balance is insufficient, the user is prompted to retry.
+* If the balance is insufficient, the transaction fails, and an email with transaction details is sent.
 
-* If sufficient funds exist, the transaction is processed.
+* If sufficient funds exist, the transaction is processed, generating an invoice.
 
-* A transaction history is generated and stored.
+* Bank/credit card verification is performed.
+
+* If verification fails, the transaction is marked as failed.
+
+* If verification is successful, a paid invoice is printed, the transaction history is generated, and transaction details are sent to the user's email.
 
 Actors:
 
@@ -65,3 +80,7 @@ Actors:
 * Transaction Service
 
 * Account Verification System
+
+* Bank/Credit Card Verification Service
+
+* Email Notification System
