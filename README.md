@@ -6,9 +6,7 @@ These activity diagrams illustrate the workflows for user authentication and tra
 
 The diagrams follow UML standards, including action states, decision nodes, and transitions. Decision nodes are represented for error handling and verification steps. These diagrams provide a structured visualization of authentication and transaction workflows, ensuring secure and efficient banking processes within RevoBank.
 
-To access the diagram: 
 
-``
 ## Installation Instructions
 1. Clone the repository:
    ```bash
