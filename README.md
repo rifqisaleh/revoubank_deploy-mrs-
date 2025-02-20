@@ -48,30 +48,34 @@ Actors:
 * Authentication Service
 
 * Email Notification<br> <br>
-<br> <br>
-
-
+<br> 
 
 <h3> 2. Transaction Handling Activity Diagram </h3>
 
 Description:
-This diagram depicts the process of handling transactions, including deposits, withdrawals, and transfers.
+This diagram depicts the process of handling transactions which includes transfer and withdrawal.
 
 Key Processes:
 
-* The user accesses the account overview page and initiates a transaction.
+* The user accesses the account overview page and selects either Transfer Funds or Withdraw Funds.
 
 * The system verifies account balance.
 
-* If the balance is insufficient, the transaction fails, and an email with transaction details is sent.
+* If the balance is insufficient, the transaction or withdrawal fails, and an email with transaction details is sent.
 
 * If sufficient funds exist, the transaction is processed, generating an invoice.
 
-* Bank/credit card verification is performed.
+* For transfers, bank/credit card verification is performed.
 
 * If verification fails, the transaction is marked as failed.
 
 * If verification is successful, a paid invoice is printed, the transaction history is generated, and transaction details are sent to the user's email.
+
+* For withdrawals, the system verifies the destination bank account number.
+
+* If verification fails (account number not found), the withdrawal fails.
+
+* If verification is successful, a paid invoice is printed, transaction history is generated, and withdrawal details are emailed to the user.
 
 Actors:
 
