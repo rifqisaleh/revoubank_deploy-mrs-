@@ -20,3 +20,10 @@ class Transaction(Base):
     amount = Column(Float, nullable=False)
     status = Column(String, default="Pending")
     user = relationship("User", back_populates="transactions")
+
+class Account(Base):
+    __tablename__ = "accounts"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    balance = Column(Float, default=0)
+    user = relationship("User", back_populates="accounts")
