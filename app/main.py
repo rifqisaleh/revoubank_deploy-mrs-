@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 from app.database import SessionLocal
 from app.models import User, Account, Transaction  
 from app.schemas import (
@@ -129,6 +129,8 @@ def delete_account(id: int, current_user: User = Depends(get_current_user), db: 
     return {"detail": "Account deleted"}
 
 # ✅ Get List of Transactions (Optional Filters)
+from sqlalchemy.orm import aliased
+
 @app.get("/transactions", response_model=List[TransactionResponse])
 def list_transactions(
     account_id: Optional[int] = None, 
@@ -137,7 +139,15 @@ def list_transactions(
     current_user: User = Depends(get_current_user), 
     db: Session = Depends(get_db)
 ):
-    query = db.query(Transaction).join(Account).filter(Account.user_id == current_user.id)
+    # Create aliases for the accounts table
+    sender_account = aliased(Account)
+    receiver_account = aliased(Account)
+
+    query = db.query(Transaction).join(
+        sender_account, sender_account.id == Transaction.sender_id, isouter=True
+    ).join(
+        receiver_account, receiver_account.id == Transaction.receiver_id, isouter=True
+    ).filter(sender_account.user_id == current_user.id)
 
     if account_id:
         query = query.filter(Transaction.sender_id == account_id)
@@ -146,13 +156,7 @@ def list_transactions(
     
     return query.all()
 
-#  Get Specific Transaction (Authorization required)
-@app.get("/transactions/{id}", response_model=TransactionResponse)
-def get_transaction(id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    transaction = db.query(Transaction).join(Account).filter(Account.user_id == current_user.id, Transaction.id == id).first()
-    if not transaction:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-    return transaction
+
 
 @app.post("/transactions/deposit/", response_model=TransactionResponse)
 def deposit(transaction: TransactionCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):

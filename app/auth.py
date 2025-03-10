@@ -52,14 +52,21 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
+        # Log the token for debugging
+        print(f"Received token: {token}")
+
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")  # Ensure user ID is stored as a string
         if user_id is None:
+            print(f"Token missing 'sub' field: {token}")
             raise credentials_exception
-    except JWTError:
+        print(f"Decoded payload: {payload}")
+    except JWTError as e:
+        print(f"JWT decoding error: {e}")
         raise credentials_exception
 
     user = db.query(User).filter(User.id == int(user_id)).first()
     if user is None:
+        print(f"User with ID {user_id} not found in database.")
         raise credentials_exception
     return user
