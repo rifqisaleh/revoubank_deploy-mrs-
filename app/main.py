@@ -156,9 +156,7 @@ def get_transaction(id: int, current_user: User = Depends(get_current_user), db:
 
 @app.post("/transactions/deposit/", response_model=TransactionResponse)
 def deposit(transaction: TransactionCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    transaction_type = transaction.transaction_type.lower()  # ✅ Convert to lowercase
-
-    if transaction_type != "deposit":  # Compare with literal lowercase value
+    if transaction.transaction_type != TransactionType.DEPOSIT:
         raise HTTPException(status_code=400, detail="Invalid transaction type")
 
     if transaction.amount <= 0:
@@ -173,7 +171,7 @@ def deposit(transaction: TransactionCreate, current_user: User = Depends(get_cur
     db_transaction = Transaction(
         receiver_id=transaction.receiver_id,
         amount=Decimal(str(transaction.amount)),
-        transaction_type=transaction_type  # Use lowercase value
+        transaction_type=TransactionType.DEPOSIT
     )
 
     db.add(db_transaction)
@@ -187,9 +185,7 @@ def deposit(transaction: TransactionCreate, current_user: User = Depends(get_cur
 # ✅ Withdraw Funds
 @app.post("/transactions/withdraw/", response_model=TransactionResponse)
 def withdraw(transaction: TransactionCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    transaction_type = transaction.transaction_type.lower()  # ✅ Convert to lowercase
-
-    if transaction_type != "withdraw":  # Compare with literal lowercase value
+    if transaction.transaction_type != TransactionType.WITHDRAWAL:
         raise HTTPException(status_code=400, detail="Invalid transaction type")
 
     account = db.query(Account).filter(Account.id == transaction.sender_id, Account.user_id == current_user.id).first()
@@ -204,7 +200,7 @@ def withdraw(transaction: TransactionCreate, current_user: User = Depends(get_cu
     db_transaction = Transaction(
         sender_id=account.id,
         amount=transaction.amount,
-        transaction_type=transaction_type  # Use lowercase value
+        transaction_type=TransactionType.WITHDRAWAL
     )
 
     db.add(db_transaction)
@@ -218,9 +214,7 @@ def withdraw(transaction: TransactionCreate, current_user: User = Depends(get_cu
 # ✅ Transfer Funds
 @app.post("/transactions/transfer/", response_model=TransactionResponse)
 def transfer(transaction: TransactionCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    transaction_type = transaction.transaction_type.lower()  # ✅ Convert to lowercase
-
-    if transaction_type != "transfer":  # Compare with literal lowercase value
+    if transaction.transaction_type != TransactionType.TRANSFER:
         raise HTTPException(status_code=400, detail="Invalid transaction type")
 
     sender = db.query(Account).filter(Account.id == transaction.sender_id, Account.user_id == current_user.id).first()
@@ -240,7 +234,7 @@ def transfer(transaction: TransactionCreate, current_user: User = Depends(get_cu
         sender_id=sender.id,
         receiver_id=receiver.id,
         amount=transaction.amount,
-        transaction_type=transaction_type  # Use lowercase value
+        transaction_type=TransactionType.TRANSFER
     )
 
     db.add(db_transaction)

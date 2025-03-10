@@ -4,12 +4,13 @@ from decimal import Decimal
 from app.database import Base
 from enum import Enum as PyEnum
 from datetime import datetime
+from app.schemas import TransactionType
 
 #  Define Enum for Transaction Types
 class TransactionType(str, PyEnum):
-    DEPOSIT = "deposit"
-    WITHDRAW = "withdraw"
-    TRANSFER = "transfer"
+    DEPOSIT = "DEPOSIT"
+    WITHDRAWAL = "WITHDRAWAL"
+    TRANSFER = "TRANSFER"
 
 class User(Base):
     __tablename__ = "users"
@@ -41,7 +42,7 @@ class Transaction(Base):
     sender_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)  
     receiver_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)  
     amount = Column(Numeric(10, 2), nullable=False)  
-    transaction_type = Column(Enum(TransactionType), nullable=False)
+    transaction_type = Column(Enum(TransactionType, name="transaction_type_enum_upper", create_type=False), nullable=False)
     date = Column(DateTime, default=datetime.utcnow)
 
     @property

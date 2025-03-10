@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from decimal import Decimal
 from enum import Enum
 from typing import Optional
@@ -43,9 +43,9 @@ class AccountResponse(BaseModel):
 
 # Transaction Types Enum
 class TransactionType(str, Enum):
-    DEPOSIT = "deposit"
-    WITHDRAWAL = "withdrawal"
-    TRANSFER = "transfer"
+    DEPOSIT = "DEPOSIT"
+    WITHDRAWAL = "WITHDRAWAL"
+    TRANSFER = "TRANSFER"
 
 # Transaction Creation Schema
 class TransactionCreate(BaseModel):
@@ -53,6 +53,11 @@ class TransactionCreate(BaseModel):
     receiver_id: Optional[int] = None  
     amount: Decimal
     transaction_type: TransactionType
+
+    @field_validator("transaction_type", mode="before")
+    @classmethod
+    def convert_to_uppercase(cls, v):
+        return v.upper() if isinstance(v, str) else v
 
     class Config:
         from_attributes = True
