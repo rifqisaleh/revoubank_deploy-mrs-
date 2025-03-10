@@ -3,33 +3,35 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-# Schema for user registration
+#  User Registration Schema
 class UserCreate(BaseModel):
     username: str
     password: str
 
-# Schema for login
+#  User Login Schema
 class UserLogin(BaseModel):
     username: str
     password: str
 
-# Response model (without password hash)
+# User Response (without password hash)
 class UserResponse(BaseModel):
     id: int
     username: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True  
 
+# Account Type Enum
 class AccountType(str, Enum):
     SAVINGS = "savings"
     CHECKING = "checking"
 
+# Account Creation Schema (user_id removed)
 class AccountCreate(BaseModel):
-    user_id: int
     account_type: AccountType
     initial_balance: Decimal = Decimal(0)
 
+# Account Response Schema
 class AccountResponse(BaseModel):
     id: int
     user_id: int
@@ -42,25 +44,24 @@ class AccountResponse(BaseModel):
 # Transaction Types Enum
 class TransactionType(str, Enum):
     DEPOSIT = "deposit"
-    WITHDRAW = "withdraw"
+    WITHDRAWAL = "withdrawal"
     TRANSFER = "transfer"
 
-# Schema for Creating a Transaction
+# Transaction Creation Schema
 class TransactionCreate(BaseModel):
     sender_id: Optional[int] = None  
     receiver_id: Optional[int] = None  
     amount: Decimal
     transaction_type: TransactionType
-    
+
     class Config:
         from_attributes = True
-        json_encoders = {Decimal: lambda v: str(v)}
 
-# Schema for Returning Transaction Data
+# Transaction Response Schema
 class TransactionResponse(BaseModel):
     id: int
-    sender_id: int | None
-    receiver_id: int | None
+    sender_id: Optional[int]
+    receiver_id: Optional[int]
     amount: Decimal
     transaction_type: TransactionType
 

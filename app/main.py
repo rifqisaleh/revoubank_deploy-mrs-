@@ -146,7 +146,7 @@ def list_transactions(
     
     return query.all()
 
-# ✅ Get Specific Transaction (Authorization required)
+#  Get Specific Transaction (Authorization required)
 @app.get("/transactions/{id}", response_model=TransactionResponse)
 def get_transaction(id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     transaction = db.query(Transaction).join(Account).filter(Account.user_id == current_user.id, Transaction.id == id).first()
@@ -154,12 +154,13 @@ def get_transaction(id: int, current_user: User = Depends(get_current_user), db:
         raise HTTPException(status_code=404, detail="Transaction not found")
     return transaction
 
-# ✅ Deposit Funds
 @app.post("/transactions/deposit/", response_model=TransactionResponse)
 def deposit(transaction: TransactionCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if transaction.transaction_type != TransactionType.DEPOSIT:
+    transaction_type = transaction.transaction_type.lower()  # ✅ Convert to lowercase
+
+    if transaction_type != "deposit":  # Compare with literal lowercase value
         raise HTTPException(status_code=400, detail="Invalid transaction type")
-    
+
     if transaction.amount <= 0:
         raise HTTPException(status_code=400, detail="Deposit amount must be greater than zero")
 
@@ -172,7 +173,7 @@ def deposit(transaction: TransactionCreate, current_user: User = Depends(get_cur
     db_transaction = Transaction(
         receiver_id=transaction.receiver_id,
         amount=Decimal(str(transaction.amount)),
-        transaction_type="deposit"
+        transaction_type=transaction_type  # Use lowercase value
     )
 
     db.add(db_transaction)
@@ -186,6 +187,11 @@ def deposit(transaction: TransactionCreate, current_user: User = Depends(get_cur
 # ✅ Withdraw Funds
 @app.post("/transactions/withdraw/", response_model=TransactionResponse)
 def withdraw(transaction: TransactionCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    transaction_type = transaction.transaction_type.lower()  # ✅ Convert to lowercase
+
+    if transaction_type != "withdraw":  # Compare with literal lowercase value
+        raise HTTPException(status_code=400, detail="Invalid transaction type")
+
     account = db.query(Account).filter(Account.id == transaction.sender_id, Account.user_id == current_user.id).first()
     
     if not account:
@@ -198,7 +204,7 @@ def withdraw(transaction: TransactionCreate, current_user: User = Depends(get_cu
     db_transaction = Transaction(
         sender_id=account.id,
         amount=transaction.amount,
-        transaction_type="withdraw"
+        transaction_type=transaction_type  # Use lowercase value
     )
 
     db.add(db_transaction)
@@ -208,9 +214,15 @@ def withdraw(transaction: TransactionCreate, current_user: User = Depends(get_cu
 
     return db_transaction
 
+
 # ✅ Transfer Funds
 @app.post("/transactions/transfer/", response_model=TransactionResponse)
 def transfer(transaction: TransactionCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    transaction_type = transaction.transaction_type.lower()  # ✅ Convert to lowercase
+
+    if transaction_type != "transfer":  # Compare with literal lowercase value
+        raise HTTPException(status_code=400, detail="Invalid transaction type")
+
     sender = db.query(Account).filter(Account.id == transaction.sender_id, Account.user_id == current_user.id).first()
     receiver = db.query(Account).filter(Account.id == transaction.receiver_id).first()
 
@@ -228,7 +240,7 @@ def transfer(transaction: TransactionCreate, current_user: User = Depends(get_cu
         sender_id=sender.id,
         receiver_id=receiver.id,
         amount=transaction.amount,
-        transaction_type="transfer"
+        transaction_type=transaction_type  # Use lowercase value
     )
 
     db.add(db_transaction)
@@ -238,3 +250,4 @@ def transfer(transaction: TransactionCreate, current_user: User = Depends(get_cu
     db.refresh(db_transaction)
 
     return db_transaction
+
