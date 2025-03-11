@@ -65,8 +65,8 @@ class TransactionCreate(BaseModel):
 # Transaction Response Schema
 class TransactionResponse(BaseModel):
     id: int
-    sender_id: Optional[int]
-    receiver_id: Optional[int]
+    sender_id: Optional[int] = None
+    receiver_id: Optional[int] = None
     amount: Decimal
     transaction_type: TransactionType
 
