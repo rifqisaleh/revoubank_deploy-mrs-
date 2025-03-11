@@ -75,10 +75,14 @@ def update_account(id: int, account_update: AccountCreate, current_user: dict = 
 # ✅ Delete Account
 @router.delete("/{id}")
 def delete_account(id: int, current_user: dict = Depends(get_current_user)):
-    """Deletes an account owned by the authenticated user."""
+    """Marks an account as deleted instead of removing it, preserving its transactions."""
+
     account = mock_db["accounts"].get(id)
     if not account or account["user_id"] != current_user["id"]:
         raise HTTPException(status_code=404, detail="Account not found or unauthorized")
 
-    del mock_db["accounts"][id]
-    return {"message": "Account deleted successfully"}
+    # ✅ Instead of deleting, mark the account as inactive
+    account["deleted"] = True  # ✅ Add a new key to mark deleted accounts
+
+    return {"message": "Account marked as deleted, transactions remain intact."}
+

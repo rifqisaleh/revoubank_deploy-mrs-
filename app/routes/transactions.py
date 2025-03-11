@@ -92,11 +92,14 @@ def transfer(transaction: TransactionCreate, current_user: dict = Depends(get_cu
 
 @router.get("/")
 def list_transactions(current_user: dict = Depends(get_current_user)):
-    """Retrieves all transactions associated with the authenticated user's accounts."""
+    """Retrieves all transactions related to the user, even if their accounts were deleted."""
     
-    user_account_ids = [acc["id"] for acc in mock_db["accounts"].values() if acc["user_id"] == current_user["id"]]
-    
+    user_id = current_user["id"]
+
+    # ✅ Instead of filtering by `accounts`, filter by transactions where `user_id` was involved
     return [
         t for t in mock_db["transactions"]
-        if t.get("receiver_id") in user_account_ids or t.get("sender_id") in user_account_ids
+        if (t.get("receiver_id") and mock_db["users"].get(user_id))
+        or (t.get("sender_id") and mock_db["users"].get(user_id))
     ]
+
