@@ -1,21 +1,58 @@
 # app/mock_database.py
 
-from typing import Dict, List
 from decimal import Decimal
 from datetime import datetime
-from app.schemas import TransactionType
+from app.utils import hash_password  # Ensure this import works
 
-# Mock database as in-memory dictionaries
 mock_db = {
-    "users": {},        
-    "accounts": {},      
-    "transactions": []  
+    "users": {
+        1: {
+            "id": 1,
+            "username": "admin",
+            "password": hash_password("admin123"),  
+            "failed_attempts": 0,
+            "is_locked": False
+        },
+        2: {
+            "id": 2,
+            "username": "tester",
+            "password": hash_password("test123"),  
+            "failed_attempts": 0,
+            "is_locked": False
+        }
+    }
+    ,
+    "accounts": {
+        1: {
+            "id": 1,
+            "user_id": 1,
+            "account_type": "savings",
+            "balance": Decimal("1000.00")
+        },
+        2: {
+            "id": 2,
+            "user_id": 2,
+            "account_type": "checking",
+            "balance": Decimal("500.00")
+        }
+    },
+    "transactions": [
+        {
+            "id": 2,
+            "sender_id": 2,   
+            "receiver_id": 1,
+            "amount": Decimal("100.00"),
+            "transaction_type": "TRANSFER",
+            "date": datetime.utcnow().isoformat()
+        }
+    ]
 }
 
-# Auto-incrementing counters for IDs
-user_id_counter = 1
-account_id_counter = 1
-transaction_id_counter = 1
+# ✅ Auto-incrementing counters
+user_id_counter = 3
+account_id_counter = 3
+transaction_id_counter = 2
+
 
 def get_mock_db():
     """ Returns the mock database dictionary. """
