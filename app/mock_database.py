@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 from datetime import datetime
-from app.utils import hash_password  # Ensure this import works
+from app.utils.user import hash_password  # Ensure this import works
 
 mock_db = {
     "users": {

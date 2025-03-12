@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from app.mock_database import get_mock_db, generate_user_id
-from app.utils import hash_password
+from app.utils.user import hash_password
 from app.auth import get_current_user
 
 router = APIRouter()

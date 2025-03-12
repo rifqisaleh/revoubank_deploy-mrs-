@@ -6,7 +6,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
 from app.mock_database import get_mock_db
-from app.utils import verify_password
+from app.utils.user import verify_password
 
 #  Load environment variables from .env file
 load_dotenv()
@@ -31,10 +31,31 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 #  Authenticate User Credentials (Using Dictionary Instead of Database)
-def authenticate_user(username: str, password: str):
+def authenticate_user(username, password):
+    LOCK_DURATION = timedelta(minutes=15)
     user = next((u for u in mock_db["users"].values() if u["username"] == username), None)
-    if not user or not verify_password(password, user["password"]):  # Assuming passwords are stored in plain text
+    if not user:
         return None
+
+    # Check if the account is locked and unlock if lock duration passed
+    if user["is_locked"]:
+        locked_time = user.get("locked_time")
+        if locked_time and datetime.now() > locked_time + LOCK_DURATION:
+            user["is_locked"] = False
+            user["failed_attempts"] = 0
+        else:
+            raise Exception("Account is locked. Please wait or contact support.")
+
+    if not verify_password(password, user["password"]):
+        user["failed_attempts"] += 1
+        if user["failed_attempts"] >= 3:
+            user["is_locked"] = True
+            user["locked_time"] = datetime.now()
+            raise Exception("Account locked due to multiple failed attempts.")
+
+        raise Exception(f"Invalid password. {3 - user['failed_attempts']} attempts left.")
+
+    user["failed_attempts"] = 0
     return user
 
 # Extract Current User from JWT Token (Using Dictionary)
