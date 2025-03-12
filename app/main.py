@@ -33,6 +33,11 @@ app.add_middleware(
     allow_headers=["*"],  
 )
 
+@app.get("/")
+def home():
+    return {"message": "Welcome to RevouBank API"}
+
+
 @app.post("/token")
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), background_tasks: BackgroundTasks = None):
     username = form_data.username
