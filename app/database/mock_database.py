@@ -9,16 +9,24 @@ mock_db = {
         1: {
             "id": 1,
             "username": "admin",
-            "password": hash_password("admin123"),  
+            "password": hash_password("admin123"),
+            "email": "admin@example.com",  # <-- Ensure email field exists
+            "full_name": "Admin User",
+            "phone_number": "1234567890",
             "failed_attempts": 0,
-            "is_locked": False
+            "is_locked": False,
+            "locked_time": None
         },
         2: {
             "id": 2,
-            "username": "tester",
-            "password": hash_password("test123"),  
+            "username": "testuser",
+            "password": hash_password("test123"),
+            "email": "testuser@example.com",  # <-- Ensure email field exists
+            "full_name": "Test User",
+            "phone_number": "0987654321",
             "failed_attempts": 0,
-            "is_locked": False
+            "is_locked": False,
+            "locked_time": None
         }
     }
     ,

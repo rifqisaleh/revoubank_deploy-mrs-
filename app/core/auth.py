@@ -5,7 +5,7 @@ from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
-from app.mock_database import get_mock_db
+from app.database.mock_database import get_mock_db
 from app.utils.user import verify_password
 
 #  Load environment variables from .env file

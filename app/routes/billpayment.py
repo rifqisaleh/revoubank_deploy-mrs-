@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from decimal import Decimal
 from datetime import datetime
-from app.mock_database import get_mock_db, generate_transaction_id
-from app.auth import get_current_user
+from app.database.mock_database import get_mock_db, generate_transaction_id
+from app.core.auth import get_current_user
 from app.utils.verification import verify_card_number
 from app.services.email.utils import send_email_async
 from app.services.invoice.invoice_generator import generate_invoice

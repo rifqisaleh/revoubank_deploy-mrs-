@@ -7,9 +7,9 @@ from app.routes.accounts import router as accounts_router
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta, datetime
-from app.auth import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.core.auth import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.utils.user import verify_password, create_access_token
-from app.mock_database import get_mock_db
+from app.database.mock_database import get_mock_db
 from app.services.email.utils import send_email_async
 from app.routes.billpayment import router as billpayment_router
 from app.routes.external_transaction import router as external_transaction_router
@@ -20,8 +20,8 @@ LOCK_DURATION = timedelta(minutes=15)
 MAX_FAILED_ATTEMPTS = 5
 
 app.include_router(users_router, prefix="/users", tags=["Users"])
-app.include_router(transactions_router, prefix="/transactions", tags=["Transactions"])
-app.include_router(accounts_router, prefix="/accounts", tags=["Accounts"])  
+app.include_router(accounts_router, prefix="/accounts", tags=["Accounts"]) 
+app.include_router(transactions_router, prefix="/transactions", tags=["Transactions"]) 
 app.include_router(billpayment_router, prefix="/billpayment", tags=["Bill Payment"])
 app.include_router(external_transaction_router, prefix="/api", tags=["External Transactions"])
 
