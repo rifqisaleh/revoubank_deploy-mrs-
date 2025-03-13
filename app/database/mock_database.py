@@ -5,7 +5,6 @@ from datetime import datetime
 from app.utils.user import hash_password  # Ensure this import works
 from app.config import DATABASE_URL
 
-
 mock_db = {
     "users": {
         1: {
@@ -106,13 +105,45 @@ def reset_dummy_data():
                 "failed_attempts": 0,
                 "is_locked": False,
                 "locked_time": None,
+            },
+            2: {
+                "id": 2,
+                "username": "testuser",
+                "password": hash_password("test123"),
+                "email": "testuser@example.com",
+                "full_name": "Test User",
+                "phone_number": "0987654321",
+                "failed_attempts": 0,
+                "is_locked": False,
+                "locked_time": None,
             }
         },
-        "accounts": {},
-        "transactions": []
+        "accounts": {
+            1: {
+                "id": 1,
+                "user_id": 1,
+                "account_type": "savings",
+                "balance": Decimal("1000.00")
+            },
+            2: {
+                "id": 2,
+                "user_id": 2,
+                "account_type": "checking",
+                "balance": Decimal("500.00")
+            }
+        },
+        "transactions": [
+            {
+                "id": 2,
+                "sender_id": 2,
+                "receiver_id": 1,
+                "amount": Decimal("100.00"),
+                "transaction_type": "TRANSFER",
+                "date": datetime.utcnow().isoformat()
+            }
+        ]
     }
 
-    user_id_counter = 2  # Start from 2 to avoid conflicts
-    account_id_counter = 1
-    transaction_id_counter = 1
-
+    user_id_counter = 3  # Ensure counters align with mock data
+    account_id_counter = 3
+    transaction_id_counter = 2

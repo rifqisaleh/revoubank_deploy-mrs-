@@ -20,6 +20,6 @@ conf = ConnectionConfig(
 )
 
 # Security & Database Configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key")
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")  # Mock DB default
+SECRET_KEY = os.getenv("SECRET_KEY", "84f4e045089970717269bb0c86ec9530e86080b3fb65c374bccd47c16e2bf3a2")
+DATABASE_URL = os.getenv("DATABASE_URL", "mock")  # Use 'mock' explicitly
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
