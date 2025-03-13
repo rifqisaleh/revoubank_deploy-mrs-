@@ -6,9 +6,6 @@ venv/
 __pycache__/
 *.pyc
 
-# Lock files
-uv.lock
-
 # IDE configuration files
 .vscode/
 .idea/

@@ -90,11 +90,27 @@ def generate_transaction_id():
 def reset_dummy_data():
     """ Reset the dummy database for testing purposes. """
     global mock_db, user_id_counter, account_id_counter, transaction_id_counter
+
+    # ✅ Ensure test users persist instead of completely clearing mock_db
     mock_db = {
-        "users": {},
+        "users": {
+            1: {  # ✅ Keep an admin/test user in the DB
+                "id": 1,
+                "username": "admin",
+                "password": hash_password("admin123"),  # Ensure it's hashed
+                "email": "admin@example.com",
+                "full_name": "Admin User",
+                "phone_number": "1234567890",
+                "failed_attempts": 0,
+                "is_locked": False,
+                "locked_time": None,
+            }
+        },
         "accounts": {},
         "transactions": []
     }
-    user_id_counter = 1
+
+    user_id_counter = 2  # Start from 2 to avoid conflicts
     account_id_counter = 1
     transaction_id_counter = 1
+

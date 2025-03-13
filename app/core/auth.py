@@ -56,7 +56,13 @@ def authenticate_user(username, password):
         raise Exception(f"Invalid password. {3 - user['failed_attempts']} attempts left.")
 
     user["failed_attempts"] = 0
-    return user
+    return {
+        "id": user["id"],
+        "username": user["username"],
+        "email": user.get("email"),  # Ensure email is returned
+        "full_name": user.get("full_name"),
+        "phone_number": user.get("phone_number"),
+    }
 
 # Extract Current User from JWT Token (Using Dictionary)
 def get_current_user(token: str = Depends(oauth2_scheme)):
@@ -66,21 +72,22 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        # Log the token for debugging
-        print(f"Received token: {token}")
-
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")  # Ensure user ID is stored as a string
         if user_id is None:
-            print(f"Token missing 'sub' field: {token}")
             raise credentials_exception
-        print(f"Decoded payload: {payload}")
-    except JWTError as e:
-        print(f"JWT decoding error: {e}")
+    except JWTError:
         raise credentials_exception
 
     user = mock_db["users"].get(int(user_id))
     if user is None:
-        print(f"User with ID {user_id} not found in mock database.")
         raise credentials_exception
-    return user
+
+    # ✅ Ensure all required fields are included
+    return {
+        "id": user["id"],
+        "username": user["username"],
+        "email": user.get("email"),  # Fix: Include email
+        "full_name": user.get("full_name"),
+        "phone_number": user.get("phone_number"),
+    }

@@ -33,10 +33,12 @@ async def register_user(user: UserCreate):
         raise HTTPException(status_code=400, detail="Email already registered")
 
     user_id = generate_user_id()
+    hashed_password = hash_password(user.password)
+    
     mock_db["users"][user_id] = {
         "id": user_id,
         "username": user.username,
-        "password": hash_password(user.password),
+        "password": hashed_password,
         "email": user.email,
         "full_name": user.full_name,
         "phone_number": user.phone_number,
@@ -63,7 +65,13 @@ def list_users():
 @router.get("/me", response_model=UserResponse)
 def get_profile(current_user: dict = Depends(get_current_user)):
     """Retrieves the profile of the currently authenticated user."""
-    return {"id": current_user["id"], "username": current_user["username"]}
+    return {
+        "id": current_user["id"],
+        "username": current_user["username"],
+        "email": current_user["email"],  # Include email in the response
+        "full_name": current_user.get("full_name"),
+        "phone_number": current_user.get("phone_number")
+    }
 
 # Update Profile of Current User
 @router.put("/me", response_model=UserResponse)
