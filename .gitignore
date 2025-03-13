@@ -10,9 +10,6 @@ __pycache__/
 .vscode/
 .idea/
 
-# Environment variable files
-.env
-
 # Log files and SQLite databases
 *.log
 *.sqlite
