@@ -1,7 +1,7 @@
 # app/email_utils.py
 import os
 from fastapi_mail import FastMail, MessageSchema, MessageType
-from app.services.email.config import conf
+from app.config import conf
 from pydantic import EmailStr
 
 async def send_email_async(subject: str, recipient: str, body: str, attachment_path: str = None):

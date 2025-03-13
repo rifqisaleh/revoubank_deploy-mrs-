@@ -7,6 +7,8 @@ from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
 from app.database.mock_database import get_mock_db
 from app.utils.user import verify_password
+from app.config import SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES
+
 
 #  Load environment variables from .env file
 load_dotenv()

@@ -13,6 +13,8 @@ from app.database.mock_database import get_mock_db
 from app.services.email.utils import send_email_async
 from app.routes.billpayment import router as billpayment_router
 from app.routes.external_transaction import router as external_transaction_router
+from app.config import conf  # Email config
+
 
 app = FastAPI()
 
