@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 from datetime import datetime
-from app.utils.user import hash_password  # Ensure this import works
+from app.utils.user import hash_password  
 from app.config import DATABASE_URL
 
 mock_db = {
@@ -11,7 +11,7 @@ mock_db = {
             "id": 1,
             "username": "admin",
             "password": hash_password("admin123"),
-            "email": "admin@example.com",  # <-- Ensure email field exists
+            "email": "admin@example.com",  
             "full_name": "Admin User",
             "phone_number": "1234567890",
             "failed_attempts": 0,
@@ -22,7 +22,7 @@ mock_db = {
             "id": 2,
             "username": "testuser",
             "password": hash_password("test123"),
-            "email": "testuser@example.com",  # <-- Ensure email field exists
+            "email": "testuser@example.com",  
             "full_name": "Test User",
             "phone_number": "0987654321",
             "failed_attempts": 0,

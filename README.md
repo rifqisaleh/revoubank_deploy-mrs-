@@ -1,102 +1,155 @@
-<h1>Activity Diagrams for User Authentication and Transaction Handling</h1>
+# RevouBank API
 
-<h2>Purpose</h2>
+## Overview
+RevouBank API is a RESTful banking system that provides user management, account management, and transaction management functionalities. It is designed to simulate real-world banking operations with security enhancements such as account locking after failed login attempts, email notifications, and invoice generation. 
 
-These activity diagrams illustrate the workflows for user authentication and transaction handling within RevoBank's web-based application. They serve as blueprints to guide the development team in implementing these functionalities efficiently. This workflow is inspired by paypal. 
+To access api docs using Swagger/Fastapi, visit this link:
+<br> https://curious-sher-mrifqiprojects-d23b26ed.koyeb.app/docs
 
-The diagrams follow UML standards, including action states, decision nodes, and transitions. Decision nodes are represented for error handling and verification steps. These diagrams provide a structured visualization of authentication and transaction workflows, ensuring secure and efficient banking processes within RevoBank.
+## Features Implemented
+- **User Management**: User registration, login, and authentication.
+- **Account Management**: Create, retrieve, update, and delete bank accounts.
+- **Transaction Management**: Perform deposits, withdrawals, and transfers.
+- **Security Enhancements**:
+  - Account locking after multiple failed login attempts
+  - Email notifications for authentication and transactions
+  - Invoice generation for transactions
+  - Bank/Credit card verification for transactions
+- **Testing**: Unit tests using pytest.
+- **CI/CD**: GitHub Actions for automated deployment on Koyeb.
 
+## Installation and Setup
 
-## Installation Instructions
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/revou-fsse-oct24/milestone-3-rifqisaleh.git
-   ```
-2. Navigate to the project directory:
-   ```bash
-   cd Revoubank-Project
-   ```
-3. Open UML Diagram inside within the directory
+### Prerequisites
+- Python 3.11
+- PostgreSQL Database
+- `uv` package manager (or `pip` if preferred)
+- WSL (for Windows users)
 
+### Clone the Repository
+```sh
+git clone https://github.com/rifqisaleh/revoubank_deploy-mrs-.git
+cd revoubank-api
+```
 
+### Set Up Virtual Environment
+```sh
+uv venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
 
-<br>
+### Install Dependencies
+```sh
+uv pip install -r requirements.txt
+```
 
-<h3> 1. User Authentication Activity Diagram </h3>
+### Configure Environment Variables
+Create a `.env` file in the project root and add the following:
+```env
+DATABASE_URL=postgresql://username:password@localhost:5432/revoubank
+SECRET_KEY=your_secret_key
+EMAIL_HOST=smtp.yourmail.com
+EMAIL_PORT=587
+EMAIL_USER=your_email
+EMAIL_PASSWORD=your_email_password
+```
 
-Description:
-This diagram outlines the login process, including credential verification, error handling, email notifications, and token generation.
+### Start the Server
+```sh
+uvicorn app.main:app --reload
+```
 
-Key Processes:
+## API Usage
 
-* The user enters login credentials.
+### Authentication
+#### Register User
+**Endpoint:** `POST /auth/register`
 
-* The system verifies the credentials.
+**Request:**
+```json
+{
+  "email": "user@example.com",
+  "password": "securepassword"
+}
+```
 
-* If the credentials are incorrect, an email notification is sent, and the login attempt is recorded.
+**Response:**
+```json
+{
+  "message": "User registered successfully",
+  "user_id": 1
+}
+```
 
-* If multiple failed attempts occur, the account is locked.
+#### Login
+**Endpoint:** `POST /auth/login`
 
-* Upon successful verification, a token is generated, granting the user access.
+**Request:**
+```json
+{
+  "email": "user@example.com",
+  "password": "securepassword"
+}
+```
 
-Actors:
+**Response:**
+```json
+{
+  "access_token": "jwt_token_here",
+  "token_type": "bearer"
+}
+```
 
-* Registered User
+### Account Management
+#### Create Bank Account
+**Endpoint:** `POST /accounts`
 
-* Authentication Service
+**Request:**
+```json
+{
+  "account_type": "savings",
+  "initial_deposit": 1000.00
+}
+```
 
-* Email Notification<br> <br>
-<br> 
+**Response:**
+```json
+{
+  "account_id": 1,
+  "balance": 1000.00
+}
+```
 
-<h3> 2. Transaction Handling Activity Diagram </h3>
+### Transactions
+#### Deposit Money
+**Endpoint:** `POST /transactions/deposit`
 
-Description:
-This diagram depicts the process of handling transactions which includes transfer, withdrawal and deposit.
+**Request:**
+```json
+{
+  "account_id": 1,
+  "amount": 500.00
+}
+```
 
-Key Processes:
+**Response:**
+```json
+{
+  "message": "Deposit successful",
+  "new_balance": 1500.00
+}
+```
 
-* The user accesses the account overview page and selects either Transfer Funds, Withdraw Funds or deposit.
+### Running Tests
+To run unit tests using pytest:
+```sh
+pytest
+```
 
-* The system verifies account balance whilst on deposit, the system instead verify account source
+### Deployment
+The RevouBank API is deployed on **Koyeb**.
 
-* If the balance is insufficient, the transaction or withdrawal fails, and an email with transaction details is sent.
+---
 
-* If sufficient funds exist, the transaction is processed, generating an invoice.
+For further inquiries, contact [mrifqisaleh@gmail.com] or check out the project repository.
 
-<h4> - Transfer </h4>
-
-* For transfers, bank/credit card verification is performed.
-
-* If verification fails, the transaction is marked as failed.
-
-* If verification is successful, a paid invoice is printed, the transaction history is generated, and transaction details are sent to the user's email.
-
-<h4> - Withdrawal </h4>
-
-* For withdrawals, the system verifies the destination bank account number.
-
-* If verification fails (account number not found), the withdrawal fails.
-
-* If verification is successful, a paid invoice is printed, transaction history is generated, and withdrawal details are emailed to the user.
-
-<h4> - Deposit </h4>
-
-* For Deposit, the system will verify whether fund source is legitimate.
-
-* If verification fails, the deposit failes.
-
-* If verification is successful, deposit will be processed, account balance updated and user will receive email notification.
-<br><br>
-
-
-Actors:
-
-* User
-
-* Transaction Service
-
-* Account Verification System
-
-* Bank/Credit Card Verification Service
-
-* Email Notification System
