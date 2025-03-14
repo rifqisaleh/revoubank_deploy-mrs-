@@ -12,7 +12,13 @@ router = APIRouter()
 
 mock_db = get_mock_db()
 
-@router.post("/billpayment/card/")
+@router.post(
+    "/billpayment/card/",
+    summary="Pay Bill with Credit Card",
+    description="Allows users to pay their bills using a credit card. "
+                "The endpoint verifies the card number, deducts the amount from the user's account, "
+                "and generates an invoice for the transaction."
+)
 async def pay_bill_with_card(
     biller_name: str,
     amount: Decimal,
@@ -71,7 +77,13 @@ async def pay_bill_with_card(
         filename=invoice_filename
     )
 
-@router.post("/billpayment/balance/")
+@router.post(
+    "/billpayment/balance/",
+    summary="Pay Bill with Account Balance",
+    description="Allows users to pay their bills using their account balance. "
+                "The endpoint deducts the amount from the user's account, "
+                "and generates an invoice for the transaction."
+)
 async def pay_bill_with_balance(
     biller_name: str,
     amount: Decimal,

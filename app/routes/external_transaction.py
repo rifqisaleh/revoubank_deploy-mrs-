@@ -12,7 +12,11 @@ router = APIRouter()
 
 mock_db = get_mock_db()
 
-@router.post("/external/deposit/")
+@router.post(
+    "/external/deposit/",
+    summary="External Deposit",
+    description="Allows a user to deposit money into their RevouBank account from an external bank."
+)
 async def external_deposit(
     bank_name: str,
     account_number: str,
@@ -65,7 +69,11 @@ async def external_deposit(
 
     return {"message": f"Successfully deposited ${amount} from {bank_name}."}
 
-@router.post("/external/withdraw/")
+@router.post(
+    "/external/withdraw/",
+    summary="External Withdrawal",
+    description="Allows a user to withdraw money from their RevouBank account to an external bank."
+)
 async def external_withdraw(
     bank_name: str,
     account_number: str,

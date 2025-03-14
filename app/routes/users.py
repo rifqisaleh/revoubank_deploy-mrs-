@@ -9,6 +9,7 @@ router = APIRouter()
 mock_db = get_mock_db()
 
 class UserCreate(BaseModel):
+    """Schema for user registration and profile update."""
     username: str
     password: str
     email: str
@@ -16,16 +17,27 @@ class UserCreate(BaseModel):
     phone_number: Optional[str] = None
 
 class UserResponse(BaseModel):
+    """Schema for returning user data."""
     id: int
     username: str
     email: str
     full_name: Optional[str] = None
     phone_number: Optional[str] = None
-    
-    
-# Register a New User
-@router.post("/", response_model=UserResponse)
+
+@router.post("/", response_model=UserResponse, summary="Register a New User", tags=["Users"])
 async def register_user(user: UserCreate):
+    """
+    Register a new user.
+
+    - **username**: Unique identifier for the user.
+    - **password**: User password (hashed).
+    - **email**: User email (must be unique).
+    - **full_name**: Optional full name.
+    - **phone_number**: Optional phone number.
+
+    Raises:
+    - 400 if the username or email is already taken.
+    """
     if any(u["username"] == user.username for u in mock_db["users"].values()):
         raise HTTPException(status_code=400, detail="Username already taken")
 
@@ -34,7 +46,7 @@ async def register_user(user: UserCreate):
 
     user_id = generate_user_id()
     hashed_password = hash_password(user.password)
-    
+
     mock_db["users"][user_id] = {
         "id": user_id,
         "username": user.username,
@@ -55,28 +67,42 @@ async def register_user(user: UserCreate):
         "phone_number": user.phone_number
     }
 
-# List All Users
-@router.get("/", response_model=list[UserResponse])
+@router.get("/", response_model=list[UserResponse], summary="List All Users", tags=["Users"])
 def list_users():
-    """Retrieves all users in the mock database."""
+    """
+    Retrieves all users in the mock database.
+
+    Returns a list of all registered users.
+    """
     return list(mock_db["users"].values())
 
-# Get Profile of Current User
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=UserResponse, summary="Get Profile of Current User", tags=["Users"])
 def get_profile(current_user: dict = Depends(get_current_user)):
-    """Retrieves the profile of the currently authenticated user."""
+    """
+    Retrieves the profile of the currently authenticated user.
+
+    - Requires authentication.
+    - Returns the user's ID, username, email, full name, and phone number.
+    """
     return {
         "id": current_user["id"],
         "username": current_user["username"],
-        "email": current_user["email"],  # Include email in the response
+        "email": current_user["email"],
         "full_name": current_user.get("full_name"),
         "phone_number": current_user.get("phone_number")
     }
 
-# Update Profile of Current User
-@router.put("/me", response_model=UserResponse)
+@router.put("/me", response_model=UserResponse, summary="Update Profile of Current User", tags=["Users"])
 def update_profile(updated_user: UserCreate, current_user: dict = Depends(get_current_user)):
-    """Updates the profile of the currently authenticated user."""
+    """
+    Updates the profile of the currently authenticated user.
+
+    - Requires authentication.
+    - Can update username, password, email, full name, and phone number.
+
+    Raises:
+    - 404 if the user is not found.
+    """
     user = mock_db["users"].get(current_user["id"])
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -95,12 +121,19 @@ def update_profile(updated_user: UserCreate, current_user: dict = Depends(get_cu
         "phone_number": user["phone_number"]
     }
 
-#  Delete User
-@router.delete("/{user_id}")
+@router.delete("/{user_id}", summary="Delete User", tags=["Users"])
 def delete_user(user_id: int):
-    """Deletes a user from the mock database."""
+    """
+    Deletes a user from the mock database.
+
+    - Requires user ID.
+    - If successful, returns a confirmation message.
+
+    Raises:
+    - 404 if the user is not found.
+    """
     if user_id not in mock_db["users"]:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     del mock_db["users"][user_id]
     return {"message": "User deleted successfully"}
