@@ -160,3 +160,11 @@ def list_transactions(current_user: dict = Depends(get_current_user)):
         if (t.get("receiver_id") and mock_db["users"].get(user_id))
         or (t.get("sender_id") and mock_db["users"].get(user_id))
     ]
+
+@router.get("/check-balance/")
+def check_balance(account_id: int, current_user: dict = Depends(get_current_user)):
+    account = mock_db["accounts"].get(account_id)
+    if not account or account["user_id"] != current_user["id"]:
+        raise HTTPException(status_code=404, detail="Account not found or unauthorized")
+    
+    return {"account_id": account_id, "balance": account["balance"]}
