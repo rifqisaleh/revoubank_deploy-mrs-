@@ -16,8 +16,9 @@ mock_db = get_mock_db()
     "/billpayment/card/",
     summary="Pay Bill with Credit Card",
     description="Allows users to pay their bills using a credit card. "
-                "The endpoint verifies the card number, deducts the amount from the user's account, "
+                "The endpoint verifies the card number (Visa or Mastercard), deducts the amount from the user's account, "
                 "and generates an invoice for the transaction."
+                "To test this endpoint, use a valid credit card number (eg. Visa: 4111 1111 1111 1111, Mastercard: 5111 1111 1111 1111)."
 )
 async def pay_bill_with_card(
     biller_name: str,
@@ -71,11 +72,15 @@ async def pay_bill_with_card(
         attachment_path=invoice_path
     )
 
-    return FileResponse(
-        invoice_path,
-        media_type='application/pdf',
-        filename=invoice_filename
-    )
+    return {
+        "file": FileResponse(
+            invoice_path,
+            media_type='application/pdf',
+            filename=invoice_filename
+        ),
+        "amount": amount,
+        "user_id": current_user["id"]
+    }
 
 @router.post(
     "/billpayment/balance/",
@@ -132,8 +137,12 @@ async def pay_bill_with_balance(
         attachment_path=invoice_path
     )
 
-    return FileResponse(
-        invoice_path,
-        media_type='application/pdf',
-        filename=invoice_filename
-    )
+    return {
+        "file": FileResponse(
+            invoice_path,
+            media_type='application/pdf',
+            filename=invoice_filename
+        ),
+        "amount": amount,
+        "user_id": current_user["id"]
+    }
