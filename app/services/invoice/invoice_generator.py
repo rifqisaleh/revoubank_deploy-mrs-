@@ -4,7 +4,10 @@ from reportlab.pdfgen import canvas
 from datetime import datetime
 import os
 
-def generate_invoice(transaction_details: dict, filename: str, user: dict):
+def generate_invoice(transaction_details: dict, filename: str, user: dict) -> str:
+    """
+    Generates an invoice PDF and returns the file path.
+    """
     invoice_dir = "app/invoices/generated"
     os.makedirs(invoice_dir, exist_ok=True)
 
@@ -19,10 +22,10 @@ def generate_invoice(transaction_details: dict, filename: str, user: dict):
     c.drawString(50, 750, f"Transaction ID: {transaction_details['id']}")
     c.drawString(50, 730, f"User: {user['username']}")
     c.drawString(50, 710, f"Transaction Type: {transaction_details['transaction_type']}")
-    c.drawString(50, 710, f"Amount: ${transaction_details['amount']}")
+    c.drawString(50, 690, f"Amount: ${transaction_details['amount']}")
 
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(50, 690, "Thank you for using RevouBank!")
+    c.drawString(50, 670, "Thank you for using RevouBank!")
 
     c.save()
 

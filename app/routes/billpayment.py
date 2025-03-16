@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse
+from flask import Blueprint, request, jsonify, send_file
+from flasgger.utils import swag_from
 from decimal import Decimal
 from datetime import datetime
 from app.database.mock_database import get_mock_db, generate_transaction_id
@@ -8,141 +8,153 @@ from app.utils.verification import verify_card_number
 from app.services.email.utils import send_email_async
 from app.services.invoice.invoice_generator import generate_invoice
 
-router = APIRouter()
-
+billpayment_bp = Blueprint('billpayment', __name__)
 mock_db = get_mock_db()
 
-@router.post(
-    "/billpayment/card/",
-    summary="Pay Bill with Credit Card",
-    description="Allows users to pay their bills using a credit card. "
-                "The endpoint verifies the card number (Visa or Mastercard), deducts the amount from the user's account, "
-                "and generates an invoice for the transaction."
-                "To test this endpoint, use a valid credit card number (eg. Visa: 4111 1111 1111 1111, Mastercard: 5111 1111 1111 1111)."
-)
-async def pay_bill_with_card(
-    biller_name: str,
-    amount: Decimal,
-    card_number: str,
-    background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
-):
-    if not verify_card_number(card_number):
-        raise HTTPException(status_code=400, detail="Invalid credit card number provided.")
-
-    user_account = next(
-        (acc for acc in mock_db["accounts"].values() if acc["user_id"] == current_user["id"]),
-        None
-    )
-    if not user_account:
-        raise HTTPException(status_code=404, detail="User account not found.")
-
-    if user_account["balance"] < amount:
-        raise HTTPException(status_code=400, detail="Insufficient balance.")
-
-    user_account["balance"] -= amount
-
-    transaction = {
-        "id": generate_transaction_id(),
-        "sender_id": user_account["id"],
-        "receiver_id": None,
-        "amount": amount,
-        "transaction_type": f"BILL PAYMENT (CARD) - {biller_name.upper()}",
-        "date": datetime.utcnow().isoformat()
+@billpayment_bp.route("/billpayment/card/", methods=["POST"])
+@swag_from({
+    "summary": "Pay a bill using a credit card",
+    "description": "Allows users to pay their bills using a credit card.",
+    "consumes": ["application/json"],
+    "produces": ["application/json"],
+    "parameters": [
+        {
+            "in": "body",
+            "name": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "biller_name": {
+                        "type": "string",
+                        "example": "Electric Company",
+                        "description": "The name of the biller"
+                    },
+                    "amount": {
+                        "type": "number",
+                        "example": 100.50,
+                        "description": "The amount to pay"
+                    },
+                    "card_number": {
+                        "type": "string",
+                        "example": "4111111111111111",
+                        "description": "The credit card number used for payment"
+                    }
+                },
+                "required": ["biller_name", "amount", "card_number"]
+            }
+        }
+    ],
+    "responses": {
+        "200": {"description": "Bill payment successful"},
+        "400": {"description": "Invalid credit card or insufficient funds"},
+        "404": {"description": "User account not found"}
     }
+})
+def pay_bill_with_card():
+    """Handles bill payments using a credit card."""
+    print("🔍 Raw Request Body:", request.get_data(as_text=True))  # Debugging
 
-    mock_db["transactions"].append(transaction)
+    if not request.is_json:
+        return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
 
-    invoice_filename = f"invoice_{transaction['id']}.pdf"
-    invoice_path = generate_invoice(transaction, invoice_filename, current_user)
+    try:
+        data = request.get_json()
+        print("🔍 Parsed JSON Data:", data)  # Debugging
 
-    email_subject = f"Bill Payment Invoice - {biller_name}"
-    email_body = f"""
-        <p>Hello {current_user['username']},</p>
-        <p>You have successfully paid your bill ({biller_name}) of <strong>${amount}</strong> using your credit card.</p>
-        <p>Please find your invoice attached.</p>
-        <p>Thank you for using RevouBank.</p>
-    """
+        if not data or "biller_name" not in data or "amount" not in data or "card_number" not in data:
+            return jsonify({"detail": "Missing required fields: biller_name, amount, card_number"}), 400
 
-    background_tasks.add_task(
-        send_email_async,
-        subject=email_subject,
-        recipient="user@example.com",
-        body=email_body,
-        attachment_path=invoice_path
-    )
+        amount = Decimal(data["amount"])
+        if amount <= 0:
+            return jsonify({"detail": "Amount must be greater than zero."}), 400
 
-    return {
-        "file": FileResponse(
-            invoice_path,
-            media_type='application/pdf',
-            filename=invoice_filename
-        ),
-        "amount": amount,
-        "user_id": current_user["id"]
+        current_user = get_current_user()
+        user_account = next(
+            (acc for acc in mock_db["accounts"].values() if acc["user_id"] == current_user["id"]),
+            None
+        )
+
+        if not user_account:
+            return jsonify({"detail": "User account not found."}), 404
+        if user_account["balance"] < amount:
+            return jsonify({"detail": "Insufficient balance."}), 400
+
+        user_account["balance"] -= amount
+
+        return jsonify({"message": f"Successfully paid ${amount} to {data['biller_name']} using a credit card."})
+
+    except (TypeError, ValueError):
+        return jsonify({"detail": "Invalid JSON format or data types"}), 400
+
+
+@billpayment_bp.route("/billpayment/balance/", methods=["POST"])
+@swag_from({
+    "summary": "Pay a bill using account balance",
+    "description": "Allows users to pay their bills using their account balance.",
+    "consumes": ["application/json"],
+    "produces": ["application/json"],
+    "parameters": [
+        {
+            "in": "body",
+            "name": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "biller_name": {
+                        "type": "string",
+                        "example": "Water Utility",
+                        "description": "The name of the biller"
+                    },
+                    "amount": {
+                        "type": "number",
+                        "example": 75.25,
+                        "description": "The amount to pay"
+                    }
+                },
+                "required": ["biller_name", "amount"]
+            }
+        }
+    ],
+    "responses": {
+        "200": {"description": "Bill payment successful"},
+        "400": {"description": "Insufficient funds"},
+        "404": {"description": "User account not found"}
     }
+})
+def pay_bill_with_balance():
+    """Handles bill payments using account balance."""
+    print("🔍 Raw Request Body:", request.get_data(as_text=True))  # Debugging
 
-@router.post(
-    "/billpayment/balance/",
-    summary="Pay Bill with Account Balance",
-    description="Allows users to pay their bills using their account balance. "
-                "The endpoint deducts the amount from the user's account, "
-                "and generates an invoice for the transaction."
-)
-async def pay_bill_with_balance(
-    biller_name: str,
-    amount: Decimal,
-    background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
-):
-    user_account = next(
-        (acc for acc in mock_db["accounts"].values() if acc["user_id"] == current_user["id"]),
-        None
-    )
-    if not user_account:
-        raise HTTPException(status_code=404, detail="User account not found.")
+    if not request.is_json:
+        return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
 
-    if user_account["balance"] < amount:
-        raise HTTPException(status_code=400, detail="Insufficient balance.")
+    try:
+        data = request.get_json()
+        print("🔍 Parsed JSON Data:", data)  # Debugging
 
-    user_account["balance"] -= amount
+        if not data or "biller_name" not in data or "amount" not in data:
+            return jsonify({"detail": "Missing required fields: biller_name, amount"}), 400
 
-    transaction = {
-        "id": generate_transaction_id(),
-        "sender_id": user_account["id"],
-        "receiver_id": None,
-        "amount": amount,
-        "transaction_type": f"BILL PAYMENT (BALANCE) - {biller_name.upper()}",
-        "date": datetime.utcnow().isoformat()
-    }
+        amount = Decimal(data["amount"])
+        if amount <= 0:
+            return jsonify({"detail": "Amount must be greater than zero."}), 400
 
-    mock_db["transactions"].append(transaction)
+        current_user = get_current_user()
+        user_account = next(
+            (acc for acc in mock_db["accounts"].values() if acc["user_id"] == current_user["id"]),
+            None
+        )
 
-    invoice_filename = f"invoice_{transaction['id']}.pdf"
-    invoice_path = generate_invoice(transaction, invoice_filename, current_user)
+        if not user_account:
+            return jsonify({"detail": "User account not found."}), 404
+        if user_account["balance"] < amount:
+            return jsonify({"detail": "Insufficient balance."}), 400
 
-    email_subject = f"Bill Payment Invoice - {biller_name}"
-    email_body = f"""
-        <p>Hello {current_user['username']},</p>
-        <p>You have successfully paid your bill ({biller_name}) of <strong>${amount}</strong> using your account balance.</p>
-        <p>Please find your invoice attached.</p>
-        <p>Thank you for using RevouBank.</p>
-    """
+        user_account["balance"] -= amount
 
-    background_tasks.add_task(
-        send_email_async,
-        subject=email_subject,
-        recipient="user@example.com",
-        body=email_body,
-        attachment_path=invoice_path
-    )
+        return jsonify({"message": f"Successfully paid ${amount} to {data['biller_name']} using account balance."})
 
-    return {
-        "file": FileResponse(
-            invoice_path,
-            media_type='application/pdf',
-            filename=invoice_filename
-        ),
-        "amount": amount,
-        "user_id": current_user["id"]
-    }
+    except (TypeError, ValueError):
+        return jsonify({"detail": "Invalid JSON format or data types"}), 400

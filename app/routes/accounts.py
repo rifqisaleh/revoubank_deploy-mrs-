@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from flask import Blueprint, request, jsonify, make_response
+from flasgger.utils import swag_from
 from app.database.mock_database import get_mock_db, generate_account_id, generate_transaction_id
 from app.core.auth import get_current_user
 from app.schemas import AccountCreate, AccountResponse
@@ -7,121 +8,219 @@ from datetime import datetime
 from app.services.email.utils import send_email_async
 from app.services.invoice.invoice_generator import generate_invoice
 
-router = APIRouter()
+accounts_bp = Blueprint('accounts', __name__)
 mock_db = get_mock_db()
 
-@router.post(
-    "/", 
-    response_model=AccountResponse,
-    summary="Create a New Account",
-    description="Creates a new account for the authenticated user. The initial balance is treated as an external deposit, generating a transaction and sending an email notification."
-)
-async def create_account(
-    account: AccountCreate, 
-    background_tasks: BackgroundTasks, 
-    current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    if user_id not in mock_db["users"]:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    account_id = generate_account_id()
-    mock_db["accounts"][account_id] = {
-        "id": account_id,
-        "user_id": user_id,
-        "account_type": account.account_type.value,
-        "balance": Decimal(str(account.initial_balance))
+@accounts_bp.route("/", methods=["POST"])
+@swag_from({
+    "summary": "Create a new bank account",
+    "description": "Creates a bank account for an authenticated user.",
+    "consumes": ["application/json"],
+    "produces": ["application/json"],
+    "parameters": [
+        {
+            "in": "body",
+            "name": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "account_type": {
+                        "type": "string",
+                        "example": "savings",
+                        "description": "Type of account (savings/checking)"
+                    },
+                    "initial_balance": {
+                        "type": "number",
+                        "example": 1000.00,
+                        "description": "Initial balance for the account"
+                    }
+                },
+                "required": ["account_type", "initial_balance"]
+            }
+        }
+    ],
+    "responses": {
+        "201": {"description": "Account created successfully"},
+        "401": {"description": "Unauthorized"},
+        "404": {"description": "User not found"}
     }
-    
-    transaction_id = generate_transaction_id()
-    transaction_record = {
-        "id": transaction_id,
-        "sender_id": None,
-        "receiver_id": account_id,
-        "amount": account.initial_balance,
-        "transaction_type": "EXTERNAL DEPOSIT (INITIAL BALANCE)",
-        "date": datetime.utcnow().isoformat()
-    }
-    mock_db["transactions"].append(transaction_record)
-    
-    invoice_filename = f"external_deposit_{transaction_id}.pdf"
-    invoice_path = generate_invoice(transaction_record, invoice_filename, current_user)
-    
-    email_subject = "Initial Account Deposit"
-    email_body = f"""
-        <p>Hello {current_user['username']},</p>
-        <p>Your new account has been created successfully with an initial deposit of <strong>${account.initial_balance}</strong>.</p>
-        <p>Please find your transaction invoice attached.</p>
-    """
-    background_tasks.add_task(
-        send_email_async,
-        subject=email_subject,
-        recipient="user@example.com",
-        body=email_body,
-        attachment_path=invoice_path
-    )
-    
-    return AccountResponse(
-        id=account_id,
-        user_id=user_id,
-        account_type=account.account_type.value,
-        balance=account.initial_balance
-    )
+})
+def create_account():
+    """Creates a bank account for the authenticated user."""
+    print("🔍 Raw Request Body:", request.get_data(as_text=True))  # Debugging
 
-@router.get(
-    "/", 
-    response_model=list[AccountResponse],
-    summary="Retrieve All Accounts",
-    description="Returns a list of all accounts owned by the authenticated user."
-)
-def list_accounts(current_user: dict = Depends(get_current_user)):
-    return [
+    if not request.is_json:
+        return make_response(jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415)
+
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return make_response(jsonify({"detail": "Unauthorized"}), 401)
+
+        user_id = current_user["id"]
+        if user_id not in mock_db["users"]:
+            return make_response(jsonify({"detail": "User not found"}), 404)
+
+        data = request.get_json()
+        account = AccountCreate(**data)
+
+        account_id = generate_account_id()
+        mock_db["accounts"][account_id] = {
+            "id": account_id,
+            "user_id": user_id,
+            "account_type": account.account_type.value,
+            "balance": Decimal(str(account.initial_balance))
+        }
+
+        return jsonify(AccountResponse(
+            id=account_id,
+            user_id=user_id,
+            account_type=account.account_type.value,
+            balance=account.initial_balance
+        ).dict()), 201
+
+    except (TypeError, ValueError):
+        return make_response(jsonify({"detail": "Invalid JSON format or data types"}), 400)
+
+
+@accounts_bp.route("/", methods=["GET"])
+@swag_from({
+    'summary': 'List user accounts',
+    'description': 'Retrieves all bank accounts associated with the authenticated user.',
+    'responses': {
+        200: {'description': 'List of accounts retrieved successfully'},
+        401: {'description': 'Unauthorized'}
+    }
+})
+def list_accounts():
+    """Retrieves all accounts associated with the authenticated user."""
+    current_user = get_current_user(request)
+    if not current_user:
+        return make_response(jsonify({"detail": "Unauthorized"}), 401)
+    
+    accounts = [
         AccountResponse(
             id=acc["id"],
             user_id=acc["user_id"],
             account_type=acc["account_type"],
             balance=acc["balance"]
-        )
+        ).dict()
         for acc in mock_db["accounts"].values()
         if acc["user_id"] == current_user["id"]
     ]
+    return jsonify(accounts)
 
-@router.get(
-    "/{id}", 
-    response_model=AccountResponse,
-    summary="Retrieve a Specific Account",
-    description="Retrieves an account by its ID if it belongs to the authenticated user."
-)
-def get_account(id: int, current_user: dict = Depends(get_current_user)):
-    account = mock_db["accounts"].get(id)
-    if not account or account["user_id"] != current_user["id"]:
-        raise HTTPException(status_code=404, detail="Account not found or unauthorized")
-    return account
-
-@router.put(
-    "/{id}", 
-    response_model=AccountResponse,
-    summary="Update an Account",
-    description="Updates the details of an account owned by the authenticated user."
-)
-def update_account(id: int, account_update: AccountCreate, current_user: dict = Depends(get_current_user)):
-    account = mock_db["accounts"].get(id)
-    if not account or account["user_id"] != current_user["id"]:
-        raise HTTPException(status_code=404, detail="Account not found or unauthorized")
+@accounts_bp.route("/<int:id>", methods=["GET"])
+@swag_from({
+    'summary': 'Retrieve a specific account',
+    'description': 'Fetches details of a specific account owned by the authenticated user.',
+    'parameters': [
+        {'name': 'id', 'in': 'path', 'type': 'integer', 'required': True}
+    ],
+    'responses': {
+        200: {'description': 'Account details retrieved successfully'},
+        401: {'description': 'Unauthorized'},
+        404: {'description': 'Account not found or unauthorized'}
+    }
+})
+def get_account(id):
+    """Fetches details of a specific account for the authenticated user."""
+    current_user = get_current_user(request)
+    if not current_user:
+        return make_response(jsonify({"detail": "Unauthorized"}), 401)
     
-    account["balance"] = Decimal(str(account_update.initial_balance))
-    account["account_type"] = account_update.account_type.value
-    return account
-
-@router.delete(
-    "/{id}",
-    summary="Delete an Account",
-    description="Marks an account as deleted instead of removing it, preserving its transactions."
-)
-def delete_account(id: int, current_user: dict = Depends(get_current_user)):
     account = mock_db["accounts"].get(id)
     if not account or account["user_id"] != current_user["id"]:
-        raise HTTPException(status_code=404, detail="Account not found or unauthorized")
+        return make_response(jsonify({"detail": "Account not found or unauthorized"}), 404)
+    
+    return jsonify(account)
+
+@accounts_bp.route("/<int:id>", methods=["PUT"])
+@swag_from({
+    "summary": "Update an account",
+    "description": "Updates account details (such as balance) for an authenticated user.",
+    "consumes": ["application/json"],
+    "produces": ["application/json"],
+    "parameters": [
+        {
+            "in": "body",
+            "name": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "account_type": {
+                        "type": "string",
+                        "example": "checking",
+                        "description": "Updated account type"
+                    },
+                    "balance": {
+                        "type": "number",
+                        "example": 1500.00,
+                        "description": "Updated account balance"
+                    }
+                },
+                "required": ["account_type", "balance"]
+            }
+        }
+    ],
+    "responses": {
+        "200": {"description": "Account updated successfully"},
+        "401": {"description": "Unauthorized"},
+        "404": {"description": "Account not found or unauthorized"}
+    }
+})
+def update_account(id):
+    """Updates an account for the authenticated user."""
+    print("🔍 Raw Request Body:", request.get_data(as_text=True))  # Debugging
+
+    if not request.is_json:
+        return make_response(jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415)
+
+    current_user = get_current_user()
+    if not current_user:
+        return make_response(jsonify({"detail": "Unauthorized"}), 401)
+
+    try:
+        account = mock_db["accounts"].get(id)
+        if not account or account["user_id"] != current_user["id"]:
+            return make_response(jsonify({"detail": "Account not found or unauthorized"}), 404)
+
+        data = request.get_json()
+        account_update = AccountCreate(**data)
+
+        account["balance"] = Decimal(str(account_update.initial_balance))
+        account["account_type"] = account_update.account_type.value
+
+        return jsonify(account)
+
+    except (TypeError, ValueError):
+        return make_response(jsonify({"detail": "Invalid JSON format or data types"}), 400)
+
+
+@accounts_bp.route("/<int:id>", methods=["DELETE"])
+@swag_from({
+    'summary': 'Delete an account',
+    'description': 'Deletes an account for the authenticated user (soft delete).',
+    'parameters': [
+        {'name': 'id', 'in': 'path', 'type': 'integer', 'required': True}
+    ],
+    'responses': {
+        200: {'description': 'Account marked as deleted'},
+        401: {'description': 'Unauthorized'},
+        404: {'description': 'Account not found or unauthorized'}
+    }
+})
+def delete_account(id):
+    """Marks an account as deleted (soft delete) for the authenticated user."""
+    current_user = get_current_user(request)
+    if not current_user:
+        return make_response(jsonify({"detail": "Unauthorized"}), 401)
+    
+    account = mock_db["accounts"].get(id)
+    if not account or account["user_id"] != current_user["id"]:
+        return make_response(jsonify({"detail": "Account not found or unauthorized"}), 404)
     
     account["deleted"] = True  
-    return {"message": "Account marked as deleted, transactions remain intact."}
+    return jsonify({"message": "Account marked as deleted, transactions remain intact."})

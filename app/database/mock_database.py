@@ -3,7 +3,9 @@
 from decimal import Decimal
 from datetime import datetime
 from app.utils.user import hash_password  
-from app.config import DATABASE_URL
+from app.config import Config
+
+DATABASE_URL = Config.DATABASE_URL
 
 mock_db = {
     "users": {
