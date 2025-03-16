@@ -29,6 +29,7 @@ def validate_content_type():
 
 @transactions_bp.route('/deposit/', methods=['POST'])
 @swag_from({
+    "tags": ["transactions"],
     "summary": "Deposit Money",
     "description": "Deposits money into a user account.",
     "consumes": ["application/json"],  # ✅ Force Swagger to recognize JSON input
@@ -63,16 +64,15 @@ def validate_content_type():
     },
     "security": [{"Bearer": []}]
 })
+
 def deposit():
     """Handles deposits for authenticated users."""
-    print("🔍 Raw Request Body:", request.get_data(as_text=True))  # Debugging
-
     if not request.is_json:
         return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
 
     try:
         data = request.get_json()
-        print("🔍 Parsed JSON Data:", data)  # Debugging
+        print("🔍 Parsed JSON Data:", data)
 
         if not data or "amount" not in data or "receiver_id" not in data:
             return jsonify({"detail": "Missing required fields: amount and receiver_id"}), 400
@@ -89,7 +89,25 @@ def deposit():
             return jsonify({"detail": "Account not found or unauthorized"}), 404
 
         account["balance"] += Decimal(str(data["amount"]))
-        return jsonify({"message": "Deposit successful", "balance": account["balance"]})
+
+        # 🔹 Generate transaction ID (Fix applied)
+        transaction_id = max((t["id"] for t in mock_db["transactions"]), default=0) + 1
+
+        # 🔹 Store transaction
+        new_transaction = {
+            "id": transaction_id,
+            "type": "deposit",
+            "receiver_id": data["receiver_id"],
+            "amount": data["amount"],
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        mock_db["transactions"].append(new_transaction)  # Append to list ✅
+
+        return jsonify({
+            "message": "Deposit successful",
+            "transaction_id": transaction_id,
+            "balance": account["balance"]
+        })
 
     except (TypeError, ValueError):
         return jsonify({"detail": "Invalid JSON format or data types"}), 400
@@ -97,6 +115,7 @@ def deposit():
 
 @transactions_bp.route('/withdraw/', methods=['POST'])
 @swag_from({
+    "tags": ["transactions"],
     "summary": "Withdraw Money",
     "description": "Withdraws money from a user account.",
     "consumes": ["application/json"],  # ✅ Ensure Swagger UI accepts JSON input
@@ -133,14 +152,12 @@ def deposit():
 })
 def withdraw():
     """Handles withdrawals for authenticated users."""
-    print("🔍 Raw Request Body:", request.get_data(as_text=True))  # Debugging
-
     if not request.is_json:
         return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
 
     try:
         data = request.get_json()
-        print("🔍 Parsed JSON Data:", data)  # Debugging
+        print("🔍 Parsed JSON Data:", data)
 
         if not data or "amount" not in data or "sender_id" not in data:
             return jsonify({"detail": "Missing required fields: amount and sender_id"}), 400
@@ -159,15 +176,34 @@ def withdraw():
         if account["balance"] < data["amount"]:
             return jsonify({"detail": "Insufficient funds"}), 400
 
-        account["balance"] -= data["amount"]
-        return jsonify({"message": "Withdrawal successful", "balance": account["balance"]})
+        account["balance"] -= Decimal(str(data["amount"]))
+
+        # 🔹 Generate transaction ID (Fix applied)
+        transaction_id = max((t["id"] for t in mock_db["transactions"]), default=0) + 1
+
+        # 🔹 Store transaction
+        new_transaction = {
+            "id": transaction_id,
+            "type": "withdrawal",
+            "sender_id": data["sender_id"],
+            "amount": data["amount"],
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        mock_db["transactions"].append(new_transaction)  # Append to list ✅
+
+        return jsonify({
+            "message": "Withdrawal successful",
+            "transaction_id": transaction_id,
+            "balance": account["balance"]
+        })
 
     except (TypeError, ValueError):
         return jsonify({"detail": "Invalid JSON format or data types"}), 400
-
-
+    
+    
 @transactions_bp.route('/transfer/', methods=['POST'])
 @swag_from({
+    "tags": ["transactions"],
     "summary": "Transfer Money",
     "description": "Transfers money between two accounts.",
     "consumes": ["application/json"],  # ✅ Ensure Swagger UI accepts JSON input
@@ -238,20 +274,40 @@ def transfer():
         if sender["balance"] < data["amount"]:
             return jsonify({"detail": "Insufficient funds"}), 400
 
-        sender["balance"] -= data["amount"]
-        receiver["balance"] += data["amount"]
+        # Deduct from sender, add to receiver
+        sender["balance"] -= Decimal(str(data["amount"]))
+        receiver["balance"] += Decimal(str(data["amount"]))
+
+        # 🔹 Generate transaction ID (Fix applied)
+        transaction_id = max((t["id"] for t in mock_db["transactions"]), default=0) + 1
+
+        # 🔹 Store transaction
+        new_transaction = {
+            "id": transaction_id,
+            "type": "transfer",
+            "sender_id": sender["user_id"],
+            "receiver_id": receiver["user_id"],
+            "amount": data["amount"],
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        mock_db["transactions"].append(new_transaction)  # Append to list ✅
+
+        print("✅ Transaction Saved:", new_transaction)  # Debugging Output
 
         return jsonify({
             "message": "Transfer successful",
+            "transaction_id": transaction_id,
             "sender_balance": sender["balance"],
             "receiver_balance": receiver["balance"]
         })
 
     except (TypeError, ValueError):
         return jsonify({"detail": "Invalid JSON format or data types"}), 400
-
+    
+    
 @transactions_bp.route('/', methods=['GET'])
 @swag_from({
+    'tags': ['transactions'],
     'summary': 'List Transactions',
     'description': 'Fetches all transactions associated with the authenticated user.',
     'responses': {
@@ -264,16 +320,14 @@ def list_transactions():
     current_user = get_current_user()
     if not current_user:
         return jsonify({"detail": "Unauthorized"}), 401
-    user_id = current_user["id"]
-    transactions = [
-        t for t in mock_db["transactions"]
-        if (t.get("receiver_id") and mock_db["users"].get(user_id))
-        or (t.get("sender_id") and mock_db["users"].get(user_id))
-    ]
-    return jsonify(transactions)
+
+    print("🔍 All Transactions:", mock_db["transactions"])  # Debugging
+
+    return jsonify(mock_db["transactions"])
 
 @transactions_bp.route('/<int:id>', methods=['GET'])
 @swag_from({
+    'tags': ['transactions'],
     'summary': 'Retrieve transaction by ID',
     'description': 'Fetches details of a specific transaction by ID.',
     'parameters': [
@@ -285,19 +339,28 @@ def list_transactions():
     },
     'security': [{"Bearer": []}]  # 🔒 Require authentication
 })
+
 def get_transaction(id):
     """Fetches a specific transaction by ID."""
     current_user = get_current_user()
     if not current_user:
         return jsonify({"detail": "Unauthorized"}), 401
+
+    print("🔍 Checking transaction ID:", id)  # Debugging
+
+    # Corrected retrieval logic
     transaction = next((t for t in mock_db["transactions"] if t["id"] == id), None)
+
     if not transaction:
+        print("❌ Transaction Not Found!")
         return jsonify({"detail": "Transaction not found"}), 404
+
     return jsonify(transaction)
 
 
 @transactions_bp.route('/check-balance/', methods=['GET'])
 @swag_from({
+    'tags': ['transactions'],
     'summary': 'Check Account Balance',
     'description': 'Fetches the balance of a user account.',
     'parameters': [
@@ -323,6 +386,7 @@ def check_balance():
 
 @transactions_bp.route('/<int:id>/check-balance', methods=['GET'])
 @swag_from({
+    'tags': ['transactions'],
     'summary': 'Check balance for a specific transaction',
     'description': 'Fetches the balance related to a specific transaction.',
     'parameters': [
@@ -334,18 +398,29 @@ def check_balance():
     },
     'security': [{"Bearer": []}]  # 🔒 Require authentication
 })
+
 def check_transaction_balance(id):
     """Fetch the balance of a specific transaction."""
     current_user = get_current_user()
     if not current_user:
         return jsonify({"detail": "Unauthorized"}), 401
+
+    print("🔍 Checking balance for transaction ID:", id)  # Debugging
+
+    # Find the transaction in the list
     transaction = next((t for t in mock_db["transactions"] if t["id"] == id), None)
+
     if not transaction:
         return jsonify({"detail": "Transaction not found"}), 404
 
-    account = mock_db["accounts"].get(transaction["receiver_id"])
+    # Identify the account involved
+    account_id = transaction.get("receiver_id") or transaction.get("sender_id")
+    if not account_id:
+        return jsonify({"detail": "Transaction does not involve a specific account"}), 400
+
+    # Retrieve the account balance
+    account = mock_db["accounts"].get(account_id)
     if not account:
         return jsonify({"detail": "Account not found"}), 404
 
     return jsonify({"transaction_id": id, "balance": account["balance"]})
-

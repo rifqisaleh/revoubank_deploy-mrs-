@@ -13,6 +13,7 @@ mock_db = get_mock_db()
 
 @billpayment_bp.route("/billpayment/card/", methods=["POST"])
 @swag_from({
+    "tags": ["bill payment"],
     "summary": "Pay a bill using a credit card",
     "description": "Allows users to pay their bills using a credit card.",
     "consumes": ["application/json"],
@@ -53,8 +54,6 @@ mock_db = get_mock_db()
 })
 def pay_bill_with_card():
     """Handles bill payments using a credit card."""
-    print("🔍 Raw Request Body:", request.get_data(as_text=True))  # Debugging
-
     if not request.is_json:
         return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
 
@@ -82,6 +81,23 @@ def pay_bill_with_card():
 
         user_account["balance"] -= amount
 
+        # 🔹 Generate transaction ID
+        transaction_id = max((t["id"] for t in mock_db["transactions"]), default=0) + 1
+
+        # 🔹 Store transaction
+        new_transaction = {
+            "id": transaction_id,
+            "type": "bill_payment",
+            "biller_name": data["biller_name"],
+            "amount": data["amount"],
+            "payment_method": "credit_card",
+            "timestamp": datetime.utcnow().isoformat(),
+            "user_id": current_user["id"]
+        }
+        mock_db["transactions"].append(new_transaction)  # Append to list ✅
+
+        print("✅ Bill Payment Transaction Saved:", new_transaction)  # Debugging Output
+
         return jsonify({"message": f"Successfully paid ${amount} to {data['biller_name']} using a credit card."})
 
     except (TypeError, ValueError):
@@ -90,6 +106,7 @@ def pay_bill_with_card():
 
 @billpayment_bp.route("/billpayment/balance/", methods=["POST"])
 @swag_from({
+    "tags": ["bill payment"],
     "summary": "Pay a bill using account balance",
     "description": "Allows users to pay their bills using their account balance.",
     "consumes": ["application/json"],
@@ -123,10 +140,9 @@ def pay_bill_with_card():
         "404": {"description": "User account not found"}
     }
 })
+
 def pay_bill_with_balance():
     """Handles bill payments using account balance."""
-    print("🔍 Raw Request Body:", request.get_data(as_text=True))  # Debugging
-
     if not request.is_json:
         return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
 
@@ -153,6 +169,23 @@ def pay_bill_with_balance():
             return jsonify({"detail": "Insufficient balance."}), 400
 
         user_account["balance"] -= amount
+
+        # 🔹 Generate transaction ID
+        transaction_id = max((t["id"] for t in mock_db["transactions"]), default=0) + 1
+
+        # 🔹 Store transaction
+        new_transaction = {
+            "id": transaction_id,
+            "type": "bill_payment",
+            "biller_name": data["biller_name"],
+            "amount": data["amount"],
+            "payment_method": "account_balance",
+            "timestamp": datetime.utcnow().isoformat(),
+            "user_id": current_user["id"]
+        }
+        mock_db["transactions"].append(new_transaction)  # Append to list ✅
+
+        print("✅ Bill Payment Transaction Saved:", new_transaction)  # Debugging Output
 
         return jsonify({"message": f"Successfully paid ${amount} to {data['biller_name']} using account balance."})
 

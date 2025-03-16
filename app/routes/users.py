@@ -19,8 +19,10 @@ class UserCreate(BaseModel):
 
 @users_bp.route("/", methods=["POST"])
 @swag_from({
+    "tags": ["users"],
     "summary": "Register a new user",
     "description": "Creates a new user account.",
+    "security": [],
     "consumes": ["application/json"],
     "produces": ["application/json"],
     "parameters": [
@@ -111,6 +113,7 @@ def register_user():
 
 @users_bp.route("/", methods=["GET"])
 @swag_from({
+    "tags": ["users"],
     'summary': 'List all users',
     'description': 'Retrieves all registered users in the system.',
     'responses': {
@@ -149,6 +152,7 @@ def get_profile():
 
 @users_bp.route("/me", methods=["PUT"])
 @swag_from({
+    "tags": ["users"],
     "summary": "Update user profile",
     "description": "Updates the profile information of the authenticated user.",
     "consumes": ["application/json"],
@@ -235,6 +239,7 @@ def update_profile():
 
 @users_bp.route("/<int:user_id>", methods=["DELETE"])
 @swag_from({
+    "tags": ["users"],
     'summary': 'Delete a user',
     'description': 'Deletes a user from the system.',
     'parameters': [

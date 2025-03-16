@@ -122,7 +122,7 @@ def login():
         locked_time = user.get("locked_time")
         if locked_time and datetime.utcnow() > locked_time + LOCK_DURATION:
             user["is_locked"] = False
-            user["failed_attempts"] = 0
+            user["failed_attempts"] = 5
         else:
             return jsonify({"detail": "Account is locked due to multiple failed login attempts. Please try again later."}), 403
 

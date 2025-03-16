@@ -13,6 +13,7 @@ mock_db = get_mock_db()
 
 @accounts_bp.route("/", methods=["POST"])
 @swag_from({
+    "tags": ["accounts"],
     "summary": "Create a new bank account",
     "description": "Creates a bank account for an authenticated user.",
     "consumes": ["application/json"],
@@ -86,6 +87,7 @@ def create_account():
 
 @accounts_bp.route("/", methods=["GET"])
 @swag_from({
+    'tags': ['accounts'],
     'summary': 'List user accounts',
     'description': 'Retrieves all bank accounts associated with the authenticated user.',
     'responses': {
@@ -113,6 +115,7 @@ def list_accounts():
 
 @accounts_bp.route("/<int:id>", methods=["GET"])
 @swag_from({
+    'tags': ['accounts'],
     'summary': 'Retrieve a specific account',
     'description': 'Fetches details of a specific account owned by the authenticated user.',
     'parameters': [
@@ -138,6 +141,7 @@ def get_account(id):
 
 @accounts_bp.route("/<int:id>", methods=["PUT"])
 @swag_from({
+    "tags": ["accounts"],
     "summary": "Update an account",
     "description": "Updates account details (such as balance) for an authenticated user.",
     "consumes": ["application/json"],
@@ -201,6 +205,7 @@ def update_account(id):
 
 @accounts_bp.route("/<int:id>", methods=["DELETE"])
 @swag_from({
+    'tags': ['accounts'],
     'summary': 'Delete an account',
     'description': 'Deletes an account for the authenticated user (soft delete).',
     'parameters': [

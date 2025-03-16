@@ -17,6 +17,7 @@ def run_background_task(func, *args, **kwargs):
 
 @external_transaction_bp.route("/external/deposit/", methods=["POST"])
 @swag_from({
+    "tags": ["external transactions"],
     "summary": "Deposit from external bank",
     "description": "Handles deposits from an external bank account into a RevouBank account.",
     "consumes": ["application/json"],
@@ -55,10 +56,9 @@ def run_background_task(func, *args, **kwargs):
         "404": {"description": "RevouBank account not found"}
     }
 })
+
 def external_deposit():
     """Handles external deposits from another bank."""
-    print("🔍 Raw Request Body:", request.get_data(as_text=True))  # Debugging
-
     if not request.is_json:
         return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
 
@@ -84,6 +84,22 @@ def external_deposit():
 
         user_account["balance"] += amount
 
+        # 🔹 Generate transaction ID
+        transaction_id = max((t["id"] for t in mock_db["transactions"]), default=0) + 1
+
+        # 🔹 Store transaction
+        new_transaction = {
+            "id": transaction_id,
+            "type": "external_deposit",
+            "bank_name": data["bank_name"],
+            "amount": data["amount"],
+            "timestamp": datetime.utcnow().isoformat(),
+            "user_id": current_user["id"]
+        }
+        mock_db["transactions"].append(new_transaction)  # Append to list ✅
+
+        print("✅ External Deposit Transaction Saved:", new_transaction)  # Debugging Output
+
         return jsonify({"message": f"Successfully deposited ${amount} from {data['bank_name']}."})
 
     except (TypeError, ValueError):
@@ -92,6 +108,7 @@ def external_deposit():
 
 @external_transaction_bp.route("/external/withdraw/", methods=["POST"])
 @swag_from({
+    "tags": ["external transactions"],
     "summary": "Withdraw to external bank",
     "description": "Handles withdrawals from a RevouBank account to an external bank account.",
     "consumes": ["application/json"],
@@ -132,8 +149,6 @@ def external_deposit():
 })
 def external_withdraw():
     """Handles external withdrawals to another bank."""
-    print("🔍 Raw Request Body:", request.get_data(as_text=True))  # Debugging
-
     if not request.is_json:
         return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
 
@@ -160,6 +175,18 @@ def external_withdraw():
             return jsonify({"detail": "Insufficient balance."}), 400
 
         user_account["balance"] -= amount
+
+        # 🔹 Store transaction
+        transaction_id = max((t["id"] for t in mock_db["transactions"]), default=0) + 1
+        new_transaction = {
+            "id": transaction_id,
+            "type": "external_withdrawal",
+            "bank_name": data["bank_name"],
+            "amount": data["amount"],
+            "timestamp": datetime.utcnow().isoformat(),
+            "user_id": current_user["id"]
+        }
+        mock_db["transactions"].append(new_transaction)
 
         return jsonify({"message": f"Withdrawal of ${amount} to {data['bank_name']} successful."})
 
