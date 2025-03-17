@@ -52,14 +52,15 @@ mock_db = get_mock_db()
         "404": {"description": "User account not found"}
     }
 })
+
 def pay_bill_with_card():
-    """Handles bill payments using a credit card."""
+    """Handles bill payments using a credit card and generates an invoice."""
     if not request.is_json:
         return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
 
     try:
         data = request.get_json()
-        print("🔍 Parsed JSON Data:", data)  # Debugging
+        print("🔍 Parsed JSON Data:", data)
 
         if not data or "biller_name" not in data or "amount" not in data or "card_number" not in data:
             return jsonify({"detail": "Missing required fields: biller_name, amount, card_number"}), 400
@@ -81,27 +82,58 @@ def pay_bill_with_card():
 
         user_account["balance"] -= amount
 
-        # 🔹 Generate transaction ID
+        # Generate transaction ID
         transaction_id = max((t["id"] for t in mock_db["transactions"]), default=0) + 1
 
-        # 🔹 Store transaction
+        # Store transaction
+       # Store transaction
         new_transaction = {
             "id": transaction_id,
             "type": "bill_payment",
+            "transaction_type": "Bill Payment",  # Ensure this is included
             "biller_name": data["biller_name"],
-            "amount": data["amount"],
-            "payment_method": "credit_card",
+            "amount": str(amount),
+            "payment_method": "account_balance",
             "timestamp": datetime.utcnow().isoformat(),
             "user_id": current_user["id"]
-        }
-        mock_db["transactions"].append(new_transaction)  # Append to list ✅
+}
 
-        print("✅ Bill Payment Transaction Saved:", new_transaction)  # Debugging Output
+        mock_db["transactions"].append(new_transaction)
+
+        # Generate invoice
+        invoice_filename = f"invoice_{transaction_id}.pdf"
+        invoice_path = generate_invoice(
+            transaction_details=new_transaction,
+            filename=invoice_filename,
+            user=current_user
+        )
+
+        # Send email with invoice attachment
+        user_email = current_user.get("email")
+        if user_email:
+            print(f"📧 Sending bill payment email to {user_email} with invoice attached")
+
+            send_email_async(
+                subject="Bill Payment Confirmation & Invoice",
+                recipient=user_email,
+                body=f"""
+                Dear {current_user['username']},
+                
+                Your bill payment of ${amount} to {data['biller_name']} has been processed successfully.
+                Transaction ID: {transaction_id}
+
+                Please find your invoice attached.
+
+                Thank you for using our service.
+                """,
+                attachment_path=invoice_path  # Attach invoice
+            )
 
         return jsonify({"message": f"Successfully paid ${amount} to {data['biller_name']} using a credit card."})
 
     except (TypeError, ValueError):
         return jsonify({"detail": "Invalid JSON format or data types"}), 400
+
 
 
 @billpayment_bp.route("/billpayment/balance/", methods=["POST"])
@@ -142,13 +174,13 @@ def pay_bill_with_card():
 })
 
 def pay_bill_with_balance():
-    """Handles bill payments using account balance."""
+    """Handles bill payments using account balance and generates an invoice."""
     if not request.is_json:
         return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
 
     try:
         data = request.get_json()
-        print("🔍 Parsed JSON Data:", data)  # Debugging
+        print("🔍 Parsed JSON Data:", data)
 
         if not data or "biller_name" not in data or "amount" not in data:
             return jsonify({"detail": "Missing required fields: biller_name, amount"}), 400
@@ -170,22 +202,51 @@ def pay_bill_with_balance():
 
         user_account["balance"] -= amount
 
-        # 🔹 Generate transaction ID
+        # Generate transaction ID
         transaction_id = max((t["id"] for t in mock_db["transactions"]), default=0) + 1
 
-        # 🔹 Store transaction
+        # Store transaction
         new_transaction = {
             "id": transaction_id,
             "type": "bill_payment",
+            "transaction_type": "Bill Payment",  # Ensure this is included
             "biller_name": data["biller_name"],
-            "amount": data["amount"],
-            "payment_method": "account_balance",
+            "amount": str(amount),
+            "payment_method": "credit_card",
             "timestamp": datetime.utcnow().isoformat(),
             "user_id": current_user["id"]
         }
-        mock_db["transactions"].append(new_transaction)  # Append to list ✅
 
-        print("✅ Bill Payment Transaction Saved:", new_transaction)  # Debugging Output
+        mock_db["transactions"].append(new_transaction)
+
+        # Generate invoice
+        invoice_filename = f"invoice_{transaction_id}.pdf"
+        invoice_path = generate_invoice(
+            transaction_details=new_transaction,
+            filename=invoice_filename,
+            user=current_user
+        )
+
+        # Send email with invoice attachment
+        user_email = current_user.get("email")
+        if user_email:
+            print(f"📧 Sending bill payment email to {user_email} with invoice attached")
+
+            send_email_async(
+                subject="Bill Payment Confirmation & Invoice",
+                recipient=user_email,
+                body=f"""
+                Dear {current_user['username']},
+                
+                Your bill payment of ${amount} to {data['biller_name']} has been processed successfully.
+                Transaction ID: {transaction_id}
+
+                Please find your invoice attached.
+
+                Thank you for using our service.
+                """,
+                attachment_path=invoice_path  # Attach invoice
+            )
 
         return jsonify({"message": f"Successfully paid ${amount} to {data['biller_name']} using account balance."})
 
