@@ -122,7 +122,7 @@ def login():
         locked_time = user.get("locked_time")
         if locked_time and datetime.utcnow() > locked_time + LOCK_DURATION:
             user["is_locked"] = False
-            user["failed_attempts"] = 5
+            user["failed_attempts"] = 5  # Reset failed attempts after lock period expires
         else:
             return jsonify({"detail": "Account is locked due to multiple failed login attempts. Please try again later."}), 403
 
@@ -132,6 +132,19 @@ def login():
         if user["failed_attempts"] >= MAX_FAILED_ATTEMPTS:
             user["is_locked"] = True
             user["locked_time"] = datetime.utcnow()
+
+            # 🔹 Send Email Notification on Lock
+            email_subject = "Your RevouBank Account is Locked"
+            email_body = (
+                f"Dear {username},\n\n"
+                "Your RevouBank account has been locked due to multiple failed login attempts.\n"
+                "Please wait 15 minutes before trying again or contact support if you need assistance.\n\n"
+                "Best regards,\nRevouBank Support"
+            )
+            send_email_async(user["email"], email_subject, email_body)  # Send the email
+
+            print(f"📧 Lock notification sent to {user['email']}")  # Debugging
+
             return jsonify({"detail": "Account locked due to multiple failed attempts. Please wait 15 minutes."}), 403
         
         attempts_left = MAX_FAILED_ATTEMPTS - user["failed_attempts"]
@@ -147,6 +160,7 @@ def login():
     access_token = create_access_token(data={"sub": str(user["id"])}, expires_delta=access_token_expires)
 
     return jsonify({"access_token": access_token, "token_type": "bearer"})
+
 
 # Run the Flask app
 if __name__ == '__main__':
