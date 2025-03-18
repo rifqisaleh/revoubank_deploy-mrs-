@@ -1,7 +1,6 @@
 import os
 import smtplib
 import threading
-import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -10,6 +9,15 @@ from email.header import Header
 from app.config import Config  # Import configuration
 
 def send_email(subject: str, recipient: str, body: str, attachment_path: str = None):
+    """Mock or Real Email Sending Based on Config"""
+
+    if Config.MOCK_EMAIL:
+        print(f"📧 [MOCK] Email to {recipient} - Subject: {subject}")
+        print(f"📧 [MOCK] Email Body: {body[:100]}...")  # Print first 100 chars for preview
+        if attachment_path:
+            print(f"📧 [MOCK] Attachment: {attachment_path}")
+        return  # Skip real email sending
+
     sender_email = Config.MAIL_USERNAME  
     sender_password = Config.MAIL_PASSWORD
     smtp_server = Config.MAIL_SERVER
@@ -20,7 +28,7 @@ def send_email(subject: str, recipient: str, body: str, attachment_path: str = N
     message["To"] = recipient
     message["Subject"] = str(Header(subject, "utf-8"))
 
-    # Attach email body with UTF-8 encoding
+    # Attach the email body with UTF-8 encoding
     message.attach(MIMEText(body, "html", "utf-8"))
 
     # Attach file only if provided and exists
@@ -34,34 +42,27 @@ def send_email(subject: str, recipient: str, body: str, attachment_path: str = N
                 message.attach(part)
         except Exception as e:
             print(f"⚠️ Warning: Could not attach file {attachment_path}: {e}")
-    elif attachment_path:
-        print(f"⚠️ Warning: Attachment file not found: {attachment_path}")
 
+    # Send the email
     try:
         with smtplib.SMTP(smtp_server, smtp_port) as server:
             server.starttls()  # Secure connection
             server.login(sender_email, sender_password)
             response = server.sendmail(sender_email, recipient, message.as_string())
 
-        # ✅ Debugging Log
-        print(f"🔍 SMTP Full Response: {response}")
-
-        # ✅ Correct Handling of SMTP Responses
-        if response == {}:  # Normal success case
-            print(f"📧 Email successfully sent to {recipient}.")
-        elif isinstance(response, tuple) and response[0] == 250:
-            print(f"📧 Email successfully sent to {recipient} (SMTP 250 OK).")  # ✅ This is now correctly handled
+        # ✅ Handle SMTP response properly
+        if not response:
+            print(f"📧 Email sent to {recipient} successfully!")
         else:
-            print(f"⚠️ Warning: Unexpected SMTP response, but email likely sent: {response}")
+            print(f"⚠️ Warning: SMTP response received - {response}")
 
     except smtplib.SMTPException as e:
-        # ✅ New Fix: Check if error is actually `(250, b'OK')`
-        if isinstance(e.args, tuple) and e.args[0] == 250:
-            print(f"📧 Email successfully sent to {recipient} (SMTP 250 OK, caught in exception).")
-        else:
-            print(f"❌ Real SMTP Exception: {e}")
+        print(f"❌ Error sending email: {e}")
 
 def send_email_async(subject: str, recipient: str, body: str, attachment_path: str = None):
-    """Send email asynchronously using threading to avoid blocking the main process."""
-    thread = threading.Thread(target=send_email, args=(subject, recipient, body, attachment_path))
-    thread.start()
+    """Send email asynchronously with mock mode support."""
+    if Config.MOCK_EMAIL:
+        send_email(subject, recipient, body, attachment_path)  # Run it immediately in mock mode
+    else:
+        thread = threading.Thread(target=send_email, args=(subject, recipient, body, attachment_path))
+        thread.start()

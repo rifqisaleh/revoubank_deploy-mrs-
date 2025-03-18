@@ -97,7 +97,7 @@ def create_account():
 })
 def list_accounts():
     """Retrieves all accounts associated with the authenticated user."""
-    current_user = get_current_user(request)
+    current_user = get_current_user()
     if not current_user:
         return make_response(jsonify({"detail": "Unauthorized"}), 401)
     
@@ -129,7 +129,7 @@ def list_accounts():
 })
 def get_account(id):
     """Fetches details of a specific account for the authenticated user."""
-    current_user = get_current_user(request)
+    current_user = get_current_user()
     if not current_user:
         return make_response(jsonify({"detail": "Unauthorized"}), 401)
     
@@ -147,6 +147,15 @@ def get_account(id):
     "consumes": ["application/json"],
     "produces": ["application/json"],
     "parameters": [
+        {
+            "in": "path",  # ✅ This defines `id` in the URL
+            "name": "id",
+            "required": True,
+            "schema": {
+                "type": "integer"
+            },
+            "description": "ID of the account to update"
+        },
         {
             "in": "body",
             "name": "body",
@@ -175,9 +184,11 @@ def get_account(id):
         "404": {"description": "Account not found or unauthorized"}
     }
 })
+
 def update_account(id):
     """Updates an account for the authenticated user."""
-    print("🔍 Raw Request Body:", request.get_data(as_text=True))  # Debugging
+    print(f"🔍 Request Headers: {request.headers}")
+    print(f"🔍 Raw Request Body: {request.get_data(as_text=True)}")
 
     if not request.is_json:
         return make_response(jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415)
@@ -187,8 +198,17 @@ def update_account(id):
         return make_response(jsonify({"detail": "Unauthorized"}), 401)
 
     try:
+        # Log database before searching
+        print(f"🔍 All Accounts: {mock_db['accounts']}")
+        print(f"🔍 Searching for Account ID: {id}")
+
         account = mock_db["accounts"].get(id)
-        if not account or account["user_id"] != current_user["id"]:
+
+        # Debug ownership check
+        if account:
+            print(f"🔍 Checking account ownership: Account User ID: {account.get('user_id')}, Current User ID: {current_user.get('id')}")
+
+        if not account or account.get("user_id") != current_user.get("id"):
             return make_response(jsonify({"detail": "Account not found or unauthorized"}), 404)
 
         data = request.get_json()
@@ -197,9 +217,10 @@ def update_account(id):
         account["balance"] = Decimal(str(account_update.initial_balance))
         account["account_type"] = account_update.account_type.value
 
-        return jsonify(account)
+        return jsonify({"message": "Account updated successfully", "account": account}), 200
 
-    except (TypeError, ValueError):
+    except (TypeError, ValueError) as e:
+        print(f"❌ Error parsing JSON: {e}")
         return make_response(jsonify({"detail": "Invalid JSON format or data types"}), 400)
 
 
@@ -219,7 +240,7 @@ def update_account(id):
 })
 def delete_account(id):
     """Marks an account as deleted (soft delete) for the authenticated user."""
-    current_user = get_current_user(request)
+    current_user = get_current_user()
     if not current_user:
         return make_response(jsonify({"detail": "Unauthorized"}), 401)
     
