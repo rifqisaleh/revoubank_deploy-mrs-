@@ -3,9 +3,11 @@
 ## Overview
 RevouBank API is a RESTful banking system that provides user management, account management, and transaction management functionalities. It is designed to simulate real-world banking operations with security enhancements such as account locking after failed login attempts, email notifications, and invoice generation. 
 
-To access api docs using Swagger/Fastapi, visit this link:
+Note: Due to mailtrap limit, the email and invoice generator are in mock.
+
+To access api docs using Swagger/Flask, visit this link:
 <br> https://curious-sher-mrifqiprojects-d23b26ed.koyeb.app/docs
-<br> http://127.0.0.1:8000/docs (Local)
+<br> http://127.0.0.1:5000/docs (Local)
 
 ## Features Implemented
 - **User Management**: User registration, login, and authentication.
@@ -15,7 +17,6 @@ To access api docs using Swagger/Fastapi, visit this link:
   - Account locking after multiple failed login attempts
   - Email notifications for authentication and transactions
   - Invoice generation for transactions
-  - Bank/Credit card verification for transactions
 - **Testing**: Unit tests using pytest.
 - **CI/CD**: GitHub Actions for automated deployment on Koyeb.
 
@@ -23,7 +24,6 @@ To access api docs using Swagger/Fastapi, visit this link:
 
 ### Prerequisites
 - Python 3.11
-- PostgreSQL Database
 - `uv` package manager (or `pip` if preferred)
 - WSL (for Windows users)
 
@@ -44,20 +44,34 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install -r requirements.txt
 ```
 
+### Synchronize Dependencies
+```sh
+uv sync
+```
+
 ### Configure Environment Variables
 Create a `.env` file in the project root and add the following:
 ```env
-DATABASE_URL=postgresql://username:password@localhost:5432/revoubank
-SECRET_KEY=your_secret_key
-EMAIL_HOST=smtp.yourmail.com
-EMAIL_PORT=587
-EMAIL_USER=your_email
-EMAIL_PASSWORD=your_email_password
+MOCK_EMAIL=True
+MAIL_SERVER=smtp.elasticemail.com
+MAIL_PORT=2525
+MAIL_USE_TLS=True
+MAIL_USE_SSL=False
+MAIL_USERNAME=revoubank@mail.com # currently inactive
+MAIL_PASSWORD=868F26B2C069F91114EF706D672C49582F25 # currently inactive
+MAIL_DEFAULT_SENDER=revoubank@mail.com # currently inactive
+SECRET_KEY=your-secret-key
+DATABASE_URL=mock
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
 ### Start the Server
 ```sh
-uvicorn app.main:app --reload
+python -m app.app 
+```
+Or
+```sh
+FLASK_APP=app/app.py flask run --debug
 ```
 
 ## API Usage
