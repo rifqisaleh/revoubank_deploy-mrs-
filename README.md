@@ -44,11 +44,6 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install -r requirements.txt
 ```
 
-### Synchronize Dependencies
-```sh
-uv sync
-```
-
 ### Configure Environment Variables
 Create a `.env` file in the project root and add the following:
 ```env

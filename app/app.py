@@ -86,7 +86,8 @@ def home():
 @app.route("/docs")
 def docs_redirect():
     """ Redirects to Swagger UI """
-    return redirect("/apidocs")
+    return redirect(request.host_url + "apidocs")
+
 
 @app.route("/token", methods=["POST"])
 def login():
@@ -164,6 +165,10 @@ def login():
 
 # Run the Flask app
 if __name__ == '__main__':
+    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
     print("\n✅ Flask app is running on http://127.0.0.1:5000")
     print("📜 Swagger Docs: http://127.0.0.1:5000/apidocs\n")
-    app.run(debug=True)
+    port = int(os.getenv("PORT", 5000))  # Default to port 5000 if not specified
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)
+
+
