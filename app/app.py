@@ -116,8 +116,12 @@ def login():
     password = form_data.get("password")
 
     user = next((user for user in get_mock_db()["users"].values() if user["username"] == username), None)
+    
     if not user:
+        print("❌ User not found!")
         return jsonify({"detail": "Incorrect username or password."}), 400
+    
+    print(f"🔒 User found: {user['username']}") 
 
     if user["is_locked"]:
         locked_time = user.get("locked_time")
@@ -126,6 +130,8 @@ def login():
             user["failed_attempts"] = 5  # Reset failed attempts after lock period expires
         else:
             return jsonify({"detail": "Account is locked due to multiple failed login attempts. Please try again later."}), 403
+
+    print(f"🔍 Stored password hash: {user['password']}")
 
     if not verify_password(password, user["password"]):
         user["failed_attempts"] += 1
