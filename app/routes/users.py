@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, abort
 from flasgger.utils import swag_from
 from pydantic import BaseModel, ValidationError
 from typing import Optional
-from app.database.mock_database import get_mock_db, generate_user_id
+from app.database.mock_database import get_mock_db, generate_user_id, save_mock_db
 from app.utils.user import hash_password
 from app.core.auth import get_current_user
 
@@ -100,6 +100,8 @@ def register_user():
             "locked_time": None
         }
 
+        save_mock_db()  # ✅ Persist user data to mock_db.json
+
         return jsonify({
             "id": user_id,
             "username": user_data.username,
@@ -110,6 +112,7 @@ def register_user():
 
     except ValidationError as e:
         return jsonify({"error": e.errors()}), 400
+
 
 @users_bp.route("/", methods=["GET"])
 @swag_from({

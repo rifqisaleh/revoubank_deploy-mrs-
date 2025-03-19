@@ -3,7 +3,7 @@ from flasgger.utils import swag_from
 from werkzeug.exceptions import BadRequest, NotFound
 from decimal import Decimal
 from datetime import datetime
-from app.database.mock_database import get_mock_db, generate_transaction_id
+from app.database.mock_database import get_mock_db, generate_transaction_id, save_mock_db
 from app.core.auth import get_current_user
 from app.services.email.utils import send_email_async
 from app.services.invoice.invoice_generator import generate_invoice
@@ -112,13 +112,17 @@ def deposit():
         new_transaction = {
             "id": transaction_id,
             "type": "deposit",
+            "transaction_type": "Deposit",  # Add this line
             "receiver_id": receiver_id,
             "amount": str(amount),  # Ensure it's stored as a string for JSON compatibility
             "timestamp": datetime.utcnow().isoformat()
         }
         mock_db["transactions"].append(new_transaction)
+        
+        # Save changes to mock database
+        save_mock_db(mock_db)
 
-       # Generate invoice
+        # Generate invoice
         invoice_filename = f"invoice_{transaction_id}.pdf"
         invoice_path = generate_invoice(
         transaction_details={
@@ -246,11 +250,15 @@ def withdraw():
         new_transaction = {
             "id": transaction_id,
             "type": "withdrawal",
+            "transaction_type": "Withdrawal",  # Add this line
             "sender_id": sender_id,
             "amount": str(amount),
             "timestamp": datetime.utcnow().isoformat()
         }
         mock_db["transactions"].append(new_transaction)
+        
+        # Save changes to mock database
+        save_mock_db(mock_db)
 
         # Generate invoice
         invoice_filename = f"invoice_{transaction_id}.pdf"
@@ -386,16 +394,20 @@ def transfer():
         # Generate transaction ID
         transaction_id = max((t["id"] for t in mock_db["transactions"]), default=0) + 1
 
-        # 🔹 Store transaction **before** generating invoice
+        # Store transaction
         new_transaction = {
             "id": transaction_id,
             "type": "transfer",
+            "transaction_type": "Transfer",  # Add this line
             "sender_id": sender_id,
             "receiver_id": receiver_id,
             "amount": str(amount),
             "timestamp": datetime.utcnow().isoformat()
         }
         mock_db["transactions"].append(new_transaction)
+        
+        # Save changes to mock database
+        save_mock_db(mock_db)
 
         # 🔹 Generate invoice AFTER transaction is stored
         invoice_filename = f"invoice_{transaction_id}.pdf"

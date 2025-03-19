@@ -3,7 +3,7 @@ from flasgger.utils import swag_from
 from decimal import Decimal
 from datetime import datetime
 from threading import Thread
-from app.database.mock_database import get_mock_db, generate_transaction_id
+from app.database.mock_database import get_mock_db, generate_transaction_id, save_mock_db
 from app.core.auth import get_current_user
 from app.services.email.utils import send_email_async
 from app.services.invoice.invoice_generator import generate_invoice
@@ -90,16 +90,16 @@ def external_deposit():
         # Store transaction
         new_transaction = {
             "id": transaction_id,
-            "type": "bill_payment",
-            "transaction_type": "Bill Payment",  # Ensure this is included
+            "type": "external_deposit",
+            "transaction_type": "External Deposit",
             "bank_name": data["bank_name"],
             "amount": str(amount),
-            "payment_method": "credit_card",
             "timestamp": datetime.utcnow().isoformat(),
             "user_id": current_user["id"]
         }
 
         mock_db["transactions"].append(new_transaction)
+        save_mock_db(mock_db)  # Save changes to mock database
 
         # Generate invoice
         invoice_filename = f"invoice_{transaction_id}.pdf"
@@ -225,6 +225,7 @@ def external_withdraw():
         }
 
         mock_db["transactions"].append(new_transaction)
+        save_mock_db(mock_db)  # Save changes to mock database
 
         # Generate invoice
         invoice_filename = f"invoice_{transaction_id}.pdf"

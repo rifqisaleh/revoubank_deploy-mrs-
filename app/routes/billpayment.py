@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, send_file
 from flasgger.utils import swag_from
 from decimal import Decimal
 from datetime import datetime
-from app.database.mock_database import get_mock_db, generate_transaction_id
+from app.database.mock_database import get_mock_db, generate_transaction_id, save_mock_db
 from app.core.auth import get_current_user
 from app.utils.verification import verify_card_number
 from app.services.email.utils import send_email_async
@@ -85,7 +85,7 @@ def pay_bill_with_card():
         # Generate transaction ID
         transaction_id = max((t["id"] for t in mock_db["transactions"]), default=0) + 1
 
-        # Store transaction
+        
        # Store transaction
         new_transaction = {
             "id": transaction_id,
@@ -99,6 +99,7 @@ def pay_bill_with_card():
 }
 
         mock_db["transactions"].append(new_transaction)
+        save_mock_db()  # Save changes to database
 
         # Generate invoice
         invoice_filename = f"invoice_{transaction_id}.pdf"
@@ -218,6 +219,7 @@ def pay_bill_with_balance():
         }
 
         mock_db["transactions"].append(new_transaction)
+        save_mock_db()  # Save changes to database
 
         # Generate invoice
         invoice_filename = f"invoice_{transaction_id}.pdf"

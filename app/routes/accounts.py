@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, make_response
 from flasgger.utils import swag_from
-from app.database.mock_database import get_mock_db, generate_account_id, generate_transaction_id
+from app.database.mock_database import get_mock_db, generate_account_id, generate_transaction_id, save_mock_db
 from app.core.auth import get_current_user
 from app.schemas import AccountCreate, AccountResponse
 from decimal import Decimal
@@ -73,6 +73,7 @@ def create_account():
             "account_type": account.account_type.value,
             "balance": Decimal(str(account.initial_balance))
         }
+        save_mock_db()  # ✅ Save to JSON so it persists
 
         return jsonify(AccountResponse(
             id=account_id,
@@ -198,13 +199,11 @@ def update_account(id):
         return make_response(jsonify({"detail": "Unauthorized"}), 401)
 
     try:
-        # Log database before searching
         print(f"🔍 All Accounts: {mock_db['accounts']}")
         print(f"🔍 Searching for Account ID: {id}")
 
         account = mock_db["accounts"].get(id)
 
-        # Debug ownership check
         if account:
             print(f"🔍 Checking account ownership: Account User ID: {account.get('user_id')}, Current User ID: {current_user.get('id')}")
 
@@ -216,6 +215,7 @@ def update_account(id):
 
         account["balance"] = Decimal(str(account_update.initial_balance))
         account["account_type"] = account_update.account_type.value
+        save_mock_db()  # ✅ Persist account updates
 
         return jsonify({"message": "Account updated successfully", "account": account}), 200
 
@@ -238,6 +238,7 @@ def update_account(id):
         404: {'description': 'Account not found or unauthorized'}
     }
 })
+
 def delete_account(id):
     """Marks an account as deleted (soft delete) for the authenticated user."""
     current_user = get_current_user()
@@ -248,5 +249,7 @@ def delete_account(id):
     if not account or account["user_id"] != current_user["id"]:
         return make_response(jsonify({"detail": "Account not found or unauthorized"}), 404)
     
-    account["deleted"] = True  
+    account["deleted"] = True
+    save_mock_db()  # ✅ Persist soft delete
+
     return jsonify({"message": "Account marked as deleted, transactions remain intact."})
