@@ -15,7 +15,7 @@ class Config:
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER")
 
 # Security & Database Configuration
-    SECRET_KEY = os.getenv("SECRET_KEY", "84f4e045089970717269bb0c86ec9530e86080b3fb65c374bccd47c16e2bf3a2")
+    SECRET_KEY = os.getenv("SECRET_KEY", "f2d49c89bb3df7c107c9dd473bc36a8177fbf528bce83d012f4db34d1b6d0dbe")
     DATABASE_URL = os.getenv("DATABASE_URL", "mock")  # Use 'mock' explicitly
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
     
