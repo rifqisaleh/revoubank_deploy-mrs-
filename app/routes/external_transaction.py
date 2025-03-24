@@ -1,15 +1,16 @@
 from flask import Blueprint, request, jsonify
+from threading import Thread
 from flasgger.utils import swag_from
 from decimal import Decimal
 from datetime import datetime
-from threading import Thread
-from app.database.mock_database import get_mock_db, generate_transaction_id, save_mock_db
+from app.model.base import get_db
+from app.model.models import Account, Transaction
 from app.core.auth import get_current_user
 from app.services.email.utils import send_email_async
 from app.services.invoice.invoice_generator import generate_invoice
 
 external_transaction_bp = Blueprint('external_transaction', __name__)
-mock_db = get_mock_db()
+
 
 def run_background_task(func, *args, **kwargs):
     thread = Thread(target=func, args=args, kwargs=kwargs)
@@ -58,84 +59,81 @@ def run_background_task(func, *args, **kwargs):
 })
 
 def external_deposit():
-    """Handles external deposits from another bank and generates an invoice."""
+    db = next(get_db())
+
     if not request.is_json:
-        return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
+        return jsonify({"detail": "Unsupported Media Type"}), 415
 
     try:
         data = request.get_json()
-        print("🔍 Parsed JSON Data:", data)
+        required_fields = {"bank_name", "account_number", "amount"}
 
-        if not data or "bank_name" not in data or "account_number" not in data or "amount" not in data:
-            return jsonify({"detail": "Missing required fields: bank_name, account_number, amount"}), 400
+        missing = required_fields - set(data.keys())
+        if missing:
+            return jsonify({"detail": f"Missing fields: {', '.join(missing)}"}), 400
+
 
         amount = Decimal(data["amount"])
         if amount <= 0:
-            return jsonify({"detail": "Amount must be greater than zero."}), 400
+            return jsonify({"detail": "Amount must be greater than zero"}), 400
 
         current_user = get_current_user()
-        user_account = next(
-            (acc for acc in mock_db["accounts"].values() if acc["user_id"] == current_user["id"]),
-            None
-        )
+        account = db.query(Account).filter_by(user_id=current_user["id"]).first()
 
-        if not user_account:
-            return jsonify({"detail": "RevouBank account not found."}), 404
+        if not account:
+            return jsonify({"detail": "User account not found"}), 404
 
-        user_account["balance"] += amount
-
-        # Generate transaction ID
-        transaction_id = max((t["id"] for t in mock_db["transactions"]), default=0) + 1
+        # Update balance
+        account.balance += float(amount)
 
         # Store transaction
-        new_transaction = {
-            "id": transaction_id,
-            "type": "external_deposit",
-            "transaction_type": "External Deposit",
-            "bank_name": data["bank_name"],
-            "amount": str(amount),
-            "timestamp": datetime.utcnow().isoformat(),
-            "user_id": current_user["id"]
-        }
+        transaction = Transaction(
+            type="external_deposit",
+            amount=float(amount),
+            receiver_id=account.id,
+            bank_name=data["bank_name"],
+            external_account_number=data["account_number"]
+        )
 
-        mock_db["transactions"].append(new_transaction)
-        save_mock_db(mock_db)  # Save changes to mock database
+        db.add(transaction)
+        db.commit()
+        db.refresh(transaction)
 
         # Generate invoice
-        invoice_filename = f"invoice_{transaction_id}.pdf"
+        invoice_filename = f"invoice_{transaction.id}.pdf"
         invoice_path = generate_invoice(
-            transaction_details=new_transaction,
+            transaction_details=transaction.as_dict(),
             filename=invoice_filename,
             user=current_user
         )
 
-        # Send email with invoice attachment
-        user_email = current_user.get("email")
-        if user_email:
-            print(f"📧 Sending external deposit email to {user_email} with invoice attached")
+        # Send email
+        send_email_async(
+            subject="External Deposit Confirmation & Invoice",
+            recipient=current_user["email"],
+            body=f"""
+            Dear {current_user['username']},
 
-            send_email_async(
-                subject="External Deposit Confirmation & Invoice",
-                recipient=user_email,
-                body=f"""
-                Dear {current_user['username']},
-                
-                A deposit of ${amount} has been received from {data['bank_name']}.
-                Transaction ID: {transaction_id}
-                New Balance: ${user_account['balance']}
+            A deposit of ${amount} was made from {data['bank_name']} into your account.
+            Transaction ID: {transaction.id}
+            New Balance: ${account.balance}
 
-                Please find your invoice attached.
+            Invoice is attached.
 
-                Thank you for using our service.
-                """,
-                attachment_path=invoice_path  # Attach invoice
-            )
+            Thank you for using RevouBank.
+            """,
+            attachment_path=invoice_path
+        )
 
-        return jsonify({"message": f"Successfully deposited ${amount} from {data['bank_name']}."})
+        return jsonify({
+            "message": f"Successfully deposited ${amount} from {data['bank_name']}",
+            "transaction_id": transaction.id,
+            "balance": account.balance
+        })
 
-    except (TypeError, ValueError):
-        return jsonify({"detail": "Invalid JSON format or data types"}), 400
-
+    except Exception as e:
+        db.rollback()
+        return jsonify({"detail": f"Error: {str(e)}"}), 400
 
 
 
@@ -182,82 +180,78 @@ def external_deposit():
 })
 
 def external_withdraw():
-    """Handles external withdrawals to another bank and generates an invoice."""
+    db = next(get_db())
+
     if not request.is_json:
-        return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
+        return jsonify({"detail": "Unsupported Media Type"}), 415
 
     try:
         data = request.get_json()
-        print("🔍 Parsed JSON Data:", data)
+        required_fields = {"bank_name", "account_number", "amount"}
 
-        if not data or "bank_name" not in data or "account_number" not in data or "amount" not in data:
-            return jsonify({"detail": "Missing required fields: bank_name, account_number, amount"}), 400
+        if not all(field in data for field in required_fields):
+            return jsonify({"detail": f"Missing fields: {required_fields - data.keys()}"}), 400
 
         amount = Decimal(data["amount"])
         if amount <= 0:
-            return jsonify({"detail": "Amount must be greater than zero."}), 400
+            return jsonify({"detail": "Amount must be greater than zero"}), 400
 
         current_user = get_current_user()
-        user_account = next(
-            (acc for acc in mock_db["accounts"].values() if acc["user_id"] == current_user["id"]),
-            None
-        )
+        account = db.query(Account).filter_by(user_id=current_user["id"]).first()
 
-        if not user_account:
-            return jsonify({"detail": "RevouBank account not found."}), 404
-        if user_account["balance"] < amount:
-            return jsonify({"detail": "Insufficient balance."}), 400
+        if not account:
+            return jsonify({"detail": "User account not found"}), 404
+        if account.balance < amount:
+            return jsonify({"detail": "Insufficient balance"}), 400
 
-        user_account["balance"] -= amount
-
-        # Generate transaction ID
-        transaction_id = max((t["id"] for t in mock_db["transactions"]), default=0) + 1
+        # Update balance
+        account.balance -= float(amount)
 
         # Store transaction
-        new_transaction = {
-            "id": transaction_id,
-            "type": "external_withdrawal",
-            "transaction_type": "External Withdrawal",  # Ensure this is included
-            "bank_name": data["bank_name"],
-            "amount": str(amount),
-            "timestamp": datetime.utcnow().isoformat(),
-            "user_id": current_user["id"]
-        }
+        transaction = Transaction(
+            type="external_withdrawal",
+            amount=float(amount),
+            sender_id=account.id,
+            bank_name=data["bank_name"],
+            external_account_number=data["account_number"]
+        )
 
-        mock_db["transactions"].append(new_transaction)
-        save_mock_db(mock_db)  # Save changes to mock database
+        db.add(transaction)
+        db.commit()
+        db.refresh(transaction)
 
         # Generate invoice
-        invoice_filename = f"invoice_{transaction_id}.pdf"
+        invoice_filename = f"invoice_{transaction.id}.pdf"
         invoice_path = generate_invoice(
-            transaction_details=new_transaction,
+            transaction_details=transaction.as_dict(),
             filename=invoice_filename,
             user=current_user
         )
 
-        # Send email with invoice attachment
-        user_email = current_user.get("email")
-        if user_email:
-            print(f"📧 Sending external withdrawal email to {user_email} with invoice attached")
+        # Send email
+        send_email_async(
+            subject="External Withdrawal Confirmation & Invoice",
+            recipient=current_user["email"],
+            body=f"""
+            Dear {current_user['username']},
 
-            send_email_async(
-                subject="External Withdrawal Confirmation & Invoice",
-                recipient=user_email,
-                body=f"""
-                Dear {current_user['username']},
-                
-                A withdrawal of ${amount} has been made to {data['bank_name']}.
-                Transaction ID: {transaction_id}
-                New Balance: ${user_account['balance']}
+            A withdrawal of ${amount} has been made to {data['bank_name']}.
+            Transaction ID: {transaction.id}
+            New Balance: ${account.balance}
 
-                Please find your invoice attached.
+            Please find your invoice attached.
 
-                Thank you for using our service.
-                """,
-                attachment_path=invoice_path  # Attach invoice
-            )
+            Thank you for using RevouBank.
+            """,
+            attachment_path=invoice_path
+        )
 
-        return jsonify({"message": f"Withdrawal of ${amount} to {data['bank_name']} successful."})
+        return jsonify({
+            "message": f"Withdrawal of ${amount} to {data['bank_name']} successful",
+            "transaction_id": transaction.id,
+            "balance": account.balance
+        })
 
-    except (TypeError, ValueError):
-        return jsonify({"detail": "Invalid JSON format or data types"}), 400
+    except Exception as e:
+        db.rollback()
+        return jsonify({"detail": f"Error: {str(e)}"}), 400

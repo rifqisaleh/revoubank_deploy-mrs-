@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, make_response
 from flasgger.utils import swag_from
-from app.database.mock_database import get_mock_db, generate_account_id, generate_transaction_id, save_mock_db
+from app.model.models import Account
+from app.model import db
 from app.core.auth import get_current_user
 from app.schemas import AccountCreate, AccountResponse
 from decimal import Decimal
@@ -9,7 +10,7 @@ from app.services.email.utils import send_email_async
 from app.services.invoice.invoice_generator import generate_invoice
 
 accounts_bp = Blueprint('accounts', __name__)
-mock_db = get_mock_db()
+
 
 @accounts_bp.route("/", methods=["POST"])
 @swag_from({
@@ -47,44 +48,37 @@ mock_db = get_mock_db()
         "404": {"description": "User not found"}
     }
 })
-def create_account():
-    """Creates a bank account for the authenticated user."""
-    print("🔍 Raw Request Body:", request.get_data(as_text=True))  # Debugging
 
+def create_account():
     if not request.is_json:
-        return make_response(jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415)
+        return make_response(jsonify({"detail": "Unsupported Media Type"}), 415)
+
+    current_user = get_current_user()
+    if not current_user:
+        return make_response(jsonify({"detail": "Unauthorized"}), 401)
 
     try:
-        current_user = get_current_user()
-        if not current_user:
-            return make_response(jsonify({"detail": "Unauthorized"}), 401)
-
-        user_id = current_user["id"]
-        if user_id not in mock_db["users"]:
-            return make_response(jsonify({"detail": "User not found"}), 404)
-
         data = request.get_json()
-        account = AccountCreate(**data)
+        account_data = AccountCreate(**data)
 
-        account_id = generate_account_id()
-        mock_db["accounts"][account_id] = {
-            "id": account_id,
-            "user_id": user_id,
-            "account_type": account.account_type.value,
-            "balance": Decimal(str(account.initial_balance))
-        }
-        save_mock_db()  # ✅ Save to JSON so it persists
+        new_account = Account(
+            user_id=current_user["id"],
+            account_type=account_data.account_type.value,
+            balance=Decimal(str(account_data.initial_balance))
+        )
+
+        db.session.add(new_account)
+        db.session.commit()
 
         return jsonify(AccountResponse(
-            id=account_id,
-            user_id=user_id,
-            account_type=account.account_type.value,
-            balance=account.initial_balance
+            id=new_account.id,
+            user_id=new_account.user_id,
+            account_type=new_account.account_type,
+            balance=float(new_account.balance)
         ).dict()), 201
 
-    except (TypeError, ValueError):
-        return make_response(jsonify({"detail": "Invalid JSON format or data types"}), 400)
-
+    except Exception as e:
+        return make_response(jsonify({"detail": str(e)}), 400)
 
 @accounts_bp.route("/", methods=["GET"])
 @swag_from({
@@ -96,23 +90,30 @@ def create_account():
         401: {'description': 'Unauthorized'}
     }
 })
+
 def list_accounts():
     """Retrieves all accounts associated with the authenticated user."""
     current_user = get_current_user()
     if not current_user:
         return make_response(jsonify({"detail": "Unauthorized"}), 401)
     
-    accounts = [
-        AccountResponse(
-            id=acc["id"],
-            user_id=acc["user_id"],
-            account_type=acc["account_type"],
-            balance=acc["balance"]
-        ).dict()
-        for acc in mock_db["accounts"].values()
-        if acc["user_id"] == current_user["id"]
-    ]
-    return jsonify(accounts)
+    try:
+        accounts = Account.query.filter_by(
+            user_id=current_user["id"],
+            is_deleted=False
+        ).all()
+        
+        return jsonify([
+            AccountResponse(
+                id=acc.id,
+                user_id=acc.user_id,
+                account_type=acc.account_type,
+                balance=float(acc.balance)
+            ).dict()
+            for acc in accounts
+        ])
+    except Exception as e:
+        return make_response(jsonify({"detail": str(e)}), 500)
 
 @accounts_bp.route("/<int:id>", methods=["GET"])
 @swag_from({
@@ -128,17 +129,31 @@ def list_accounts():
         404: {'description': 'Account not found or unauthorized'}
     }
 })
+
 def get_account(id):
     """Fetches details of a specific account for the authenticated user."""
     current_user = get_current_user()
     if not current_user:
         return make_response(jsonify({"detail": "Unauthorized"}), 401)
     
-    account = mock_db["accounts"].get(id)
-    if not account or account["user_id"] != current_user["id"]:
-        return make_response(jsonify({"detail": "Account not found or unauthorized"}), 404)
-    
-    return jsonify(account)
+    try:
+        account = Account.query.filter_by(
+            id=id,
+            user_id=current_user["id"],
+            is_deleted=False
+        ).first()
+        
+        if not account:
+            return make_response(jsonify({"detail": "Account not found or unauthorized"}), 404)
+        
+        return jsonify(AccountResponse(
+            id=account.id,
+            user_id=account.user_id,
+            account_type=account.account_type,
+            balance=float(account.balance)
+        ).dict())
+    except Exception as e:
+        return make_response(jsonify({"detail": str(e)}), 500)
 
 @accounts_bp.route("/<int:id>", methods=["PUT"])
 @swag_from({
@@ -188,40 +203,44 @@ def get_account(id):
 
 def update_account(id):
     """Updates an account for the authenticated user."""
-    print(f"🔍 Request Headers: {request.headers}")
-    print(f"🔍 Raw Request Body: {request.get_data(as_text=True)}")
-
     if not request.is_json:
-        return make_response(jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415)
+        return make_response(jsonify({"detail": "Unsupported Media Type"}), 415)
 
     current_user = get_current_user()
     if not current_user:
         return make_response(jsonify({"detail": "Unauthorized"}), 401)
 
     try:
-        print(f"🔍 All Accounts: {mock_db['accounts']}")
-        print(f"🔍 Searching for Account ID: {id}")
+        account = Account.query.filter_by(
+            id=id,
+            user_id=current_user["id"],
+            is_deleted=False
+        ).first()
 
-        account = mock_db["accounts"].get(id)
-
-        if account:
-            print(f"🔍 Checking account ownership: Account User ID: {account.get('user_id')}, Current User ID: {current_user.get('id')}")
-
-        if not account or account.get("user_id") != current_user.get("id"):
+        if not account:
             return make_response(jsonify({"detail": "Account not found or unauthorized"}), 404)
 
         data = request.get_json()
         account_update = AccountCreate(**data)
 
-        account["balance"] = Decimal(str(account_update.initial_balance))
-        account["account_type"] = account_update.account_type.value
-        save_mock_db()  # ✅ Persist account updates
+        account.balance = Decimal(str(account_update.initial_balance))
+        account.account_type = account_update.account_type.value
+        
+        db.session.commit()
 
-        return jsonify({"message": "Account updated successfully", "account": account}), 200
+        return jsonify({
+            "message": "Account updated successfully",
+            "account": AccountResponse(
+                id=account.id,
+                user_id=account.user_id,
+                account_type=account.account_type,
+                balance=float(account.balance)
+            ).dict()
+        }), 200
 
-    except (TypeError, ValueError) as e:
-        print(f"❌ Error parsing JSON: {e}")
-        return make_response(jsonify({"detail": "Invalid JSON format or data types"}), 400)
+    except Exception as e:
+        db.session.rollback()
+        return make_response(jsonify({"detail": str(e)}), 400)
 
 
 @accounts_bp.route("/<int:id>", methods=["DELETE"])
@@ -245,11 +264,20 @@ def delete_account(id):
     if not current_user:
         return make_response(jsonify({"detail": "Unauthorized"}), 401)
     
-    account = mock_db["accounts"].get(id)
-    if not account or account["user_id"] != current_user["id"]:
-        return make_response(jsonify({"detail": "Account not found or unauthorized"}), 404)
-    
-    account["deleted"] = True
-    save_mock_db()  # ✅ Persist soft delete
+    try:
+        account = Account.query.filter_by(
+            id=id,
+            user_id=current_user["id"],
+            is_deleted=False
+        ).first()
+        
+        if not account:
+            return make_response(jsonify({"detail": "Account not found or unauthorized"}), 404)
+        
+        account.is_deleted = True
+        db.session.commit()
 
-    return jsonify({"message": "Account marked as deleted, transactions remain intact."})
+        return jsonify({"message": "Account marked as deleted, transactions remain intact."})
+    except Exception as e:
+        db.session.rollback()
+        return make_response(jsonify({"detail": str(e)}), 500)

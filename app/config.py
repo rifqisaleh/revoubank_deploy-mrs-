@@ -16,9 +16,9 @@ class Config:
 
 # Security & Database Configuration
     SECRET_KEY = os.getenv("SECRET_KEY", "f2d49c89bb3df7c107c9dd473bc36a8177fbf528bce83d012f4db34d1b6d0dbe")
-    DATABASE_URL = os.getenv("DATABASE_URL", "mock")  # Use 'mock' explicitly
+    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///revoubank.db")
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
     
 
-print(f"🔍 MOCK_EMAIL Loaded: {Config.MOCK_EMAIL}")
+
     

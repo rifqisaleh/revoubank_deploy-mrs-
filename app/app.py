@@ -5,7 +5,10 @@ from datetime import timedelta, datetime
 from flasgger import Swagger
 from app.core.auth import authenticate_user, create_access_token
 from app.utils.user import verify_password
-from app.database.mock_database import get_mock_db, save_mock_db
+from app.database.base import get_db
+from app.database.models import User
+from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy import update
 from app.services.email.utils import send_email_async
 from app.config import Config
 
@@ -111,68 +114,62 @@ def login():
       403:
         description: Account is locked
     """
+    db = next(get_db())
     form_data = request.form
     username = form_data.get("username")
     password = form_data.get("password")
 
-    get_mock_db()  # ✅ Always load the latest user data before checking
-    user = next((user for user in get_mock_db()["users"].values() if user["username"] == username), None)
-    
-    if not user:
-        print("❌ User not found!")
-        return jsonify({"detail": "Incorrect username or password."}), 400
-    
-    print(f"🔒 User found: {user['username']}") 
+    user = db.query(User).filter_by(username=username).first()
 
-    if user["is_locked"]:
-        locked_time = user.get("locked_time")
-        if locked_time and datetime.utcnow() > locked_time + LOCK_DURATION:
-            user["is_locked"] = False
-            user["failed_attempts"] = 5  # Reset failed attempts after lock period expires
-            save_mock_db()  # ✅ Persist status after unlock
+    if not user:
+        return jsonify({"detail": "Incorrect username or password."}), 400
+
+    # Check if account is locked
+    if user.is_locked:
+        if user.locked_time and datetime.utcnow() > user.locked_time + LOCK_DURATION:
+            user.is_locked = False
+            user.failed_attempts = 0
+            db.commit()
         else:
             return jsonify({"detail": "Account is locked due to multiple failed login attempts. Please try again later."}), 403
 
-    print(f"🔍 Stored password hash: {user['password']}")
+    if not verify_password(password, user.password):
+        user.failed_attempts += 1
 
-    if not verify_password(password, user["password"]):
-        user["failed_attempts"] += 1
-        save_mock_db()  # ✅ Persist failed login attempts
+        if user.failed_attempts >= MAX_FAILED_ATTEMPTS:
+            user.is_locked = True
+            user.locked_time = datetime.utcnow()
 
-        if user["failed_attempts"] >= MAX_FAILED_ATTEMPTS:
-            user["is_locked"] = True
-            user["locked_time"] = datetime.utcnow()
+            # Send lock email
+            send_email_async(
+                subject="Your RevouBank Account is Locked",
+                recipient=user.email,
+                body=f"""
+                Dear {username},
 
-            # 🔹 Send Email Notification on Lock
-            email_subject = "Your RevouBank Account is Locked"
-            email_body = (
-                f"Dear {username},\n\n"
-                "Your RevouBank account has been locked due to multiple failed login attempts.\n"
-                "Please wait 15 minutes before trying again or contact support if you need assistance.\n\n"
-                "Best regards,\nRevouBank Support"
+                Your RevouBank account has been locked due to multiple failed login attempts.
+                Please wait 15 minutes before trying again.
+
+                - RevouBank Support
+                """
             )
-            send_email_async(user["email"], email_subject, email_body)  # Send the email
 
-            save_mock_db()  # ✅ Persist account lock status
-            print(f"📧 Lock notification sent to {user['email']}")  # Debugging
+        db.commit()
 
-            return jsonify({"detail": "Account locked due to multiple failed attempts. Please wait 15 minutes."}), 403
-        
-        attempts_left = MAX_FAILED_ATTEMPTS - user["failed_attempts"]
+        attempts_left = MAX_FAILED_ATTEMPTS - user.failed_attempts
         return jsonify({"detail": f"Incorrect password. Attempts left: {attempts_left}"}), 400
 
-    # ✅ Reset failed attempts after successful login
-    user["failed_attempts"] = 0
-    user["is_locked"] = False
-    user["locked_time"] = None
-    save_mock_db()  # ✅ Persist reset login state
+    # Successful login
+    user.failed_attempts = 0
+    user.is_locked = False
+    user.locked_time = None
+    db.commit()
 
-    # Create JWT token
-    access_token_expires = timedelta(minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30)))
-    access_token = create_access_token(data={"sub": str(user["id"])}, expires_delta=access_token_expires)
+    # Generate JWT token
+    access_token_expires = timedelta(minutes=Config.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(data={"sub": str(user.id)}, expires_delta=access_token_expires)
 
     return jsonify({"access_token": access_token, "token_type": "bearer"})
-
 
 # Run the Flask app
 if __name__ == '__main__':
