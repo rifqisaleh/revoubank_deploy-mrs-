@@ -1,20 +1,21 @@
+import os
 from flask import Flask, request, jsonify
 from datetime import timedelta
 from app.core.auth import authenticate_user, create_access_token
-from app.config import Config, MAX_FAILED_ATTEMPTS, LOCK_DURATION
+from config import Config
 from app.utils.user import verify_password
-from flask_sqlalchemy import SQLAlchemy
-from app.model.models import get_db
+from app.database.db import db, get_db
 from app.model.models import User
 from app.services.email.utils import send_email_async
 from flask_cors import CORS
 from datetime import timedelta, datetime
+from config import Config
 
-db = SQLAlchemy()
 
 def create_app():
     app = Flask(__name__)
-    app.config.from_object("config.Config")
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+    app.config.from_object(Config)
     db.init_app(app)
     CORS(app)
     
@@ -61,7 +62,7 @@ def create_app():
 
         # Check if account is locked
         if user.is_locked:
-            if user.locked_time and datetime.utcnow() > user.locked_time + LOCK_DURATION:
+            if user.locked_time and datetime.utcnow() > user.locked_time + Config.LOCK_DURATION:
                 user.is_locked = False
                 user.failed_attempts = 0
                 db.commit()
@@ -71,7 +72,7 @@ def create_app():
         if not verify_password(password, user.password):
             user.failed_attempts += 1
 
-            if user.failed_attempts >= MAX_FAILED_ATTEMPTS:
+            if user.failed_attempts >= Config.MAX_FAILED_ATTEMPTS:
                 user.is_locked = True
                 user.locked_time = datetime.utcnow()
 
@@ -91,7 +92,7 @@ def create_app():
 
             db.commit()
 
-            attempts_left = MAX_FAILED_ATTEMPTS - user.failed_attempts
+            attempts_left = Config.MAX_FAILED_ATTEMPTS - user.failed_attempts
             return jsonify({"detail": f"Incorrect password. Attempts left: {attempts_left}"}), 400
 
         # Successful login

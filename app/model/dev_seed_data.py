@@ -5,7 +5,7 @@ import os
 from decimal import Decimal
 from datetime import datetime
 from app.utils.user import hash_password  
-from app.config import Config
+from config import Config
 
 DATABASE_URL = Config.DATABASE_URL
 DB_FILE = "mock_db.json"

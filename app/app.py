@@ -7,7 +7,7 @@ if __name__ == '__main__':
     from flask import request, jsonify, redirect
     from flasgger import Swagger
     from datetime import timedelta
-    from app.config import Config
+    from config import Config
 
     # Swagger config
     swagger_template = {

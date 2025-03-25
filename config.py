@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from datetime import timedelta
 
 # Load environment variables from .env file
 load_dotenv()
@@ -19,6 +20,7 @@ class Config:
     DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///revoubank.db")
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
     
+    MAX_FAILED_ATTEMPTS = 4
+    LOCK_DURATION = timedelta(minutes=15)
 
 
-    

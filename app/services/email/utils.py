@@ -6,7 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from email.header import Header
-from app.config import Config  # Import configuration
+from config import Config  # Import configuration
 
 def send_email(subject: str, recipient: str, body: str, attachment_path: str = None):
     """Mock or Real Email Sending Based on Config"""
