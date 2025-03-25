@@ -1,9 +1,16 @@
+import os
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Create Flask-SQLAlchemy DB instance
 db = SQLAlchemy()
 
-def get_db():
-    from flask import current_app
-    if not hasattr(current_app, 'db_session'):
-        current_app.db_session = db.session
-    yield current_app.db_session
+# Define SQLAlchemy engine and SessionLocal for manual session management
+DATABASE_URL = os.getenv("DATABASE_URL")
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
