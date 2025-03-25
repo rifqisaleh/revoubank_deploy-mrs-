@@ -32,7 +32,7 @@ class Account(db.Model):
     
     user = db.relationship('User', backref=db.backref('accounts', lazy=True))
     
-class Transaction(Base):
+class Transaction(db.Model):
     __tablename__ = 'transactions'
 
     id = Column(Integer, primary_key=True)

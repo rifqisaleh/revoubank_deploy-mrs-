@@ -1,9 +1,15 @@
 from app import create_app
-from app.database.db import db  # or from app import db, depending on your setup
-from app.model import models  # Make sure this import triggers all model declarations
+from app.database.db import db
+from app.model import User, Account, Transaction
+from app.model.models import Base  # For Transaction models using declarative_base
 
 app = create_app()
 
 with app.app_context():
-    db.create_all()
-    print("✅ Tables created.")
+    print("🔍 Creating db.Model tables...")
+    db.create_all()  # Handles User, Account
+
+    print("🔍 Creating Base metadata tables...")
+    Base.metadata.create_all(db.engine)  # Handles Transaction, ExternalTransaction, BillPayment
+
+    print("✅ All tables created.")
