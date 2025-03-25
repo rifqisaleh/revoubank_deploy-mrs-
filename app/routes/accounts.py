@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, make_response
 from flasgger.utils import swag_from
 from app.model.models import Account
-from app.model import db
+from app.model.models import db
 from app.core.auth import get_current_user
 from app.schemas import AccountCreate, AccountResponse
 from decimal import Decimal

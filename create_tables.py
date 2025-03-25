@@ -1,6 +1,7 @@
-from app import app, db
-from app.model.models import models # Ensure models are imported
+from app.app import app
+from app import db
+from app.model import models
 
 with app.app_context():
     db.create_all()
-    print("✅ Tables created successfully.")
+    print("✅ Tables created.")
