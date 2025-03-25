@@ -79,7 +79,7 @@ def pay_bill_with_card():
         if account.balance < amount:
             return jsonify({"detail": "Insufficient balance"}), 400
 
-        account.balance -= float(amount)
+        account.balance += Decimal(str(amount))
 
         transaction = Transaction(
             type="bill_payment",
@@ -191,7 +191,7 @@ def pay_bill_with_balance():
         if account.balance < amount:
             return jsonify({"detail": "Insufficient balance"}), 400
 
-        account.balance -= float(amount)
+        account.balance += Decimal(str(amount))
 
         transaction = Transaction(
             type="bill_payment",

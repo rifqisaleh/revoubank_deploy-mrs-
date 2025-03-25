@@ -106,7 +106,7 @@ def deposit():
         if account.user_id != current_user["id"]:
             return jsonify({"detail": "Unauthorized to deposit to this account"}), 403
 
-        account.balance += float(amount)
+        account.balance += Decimal(str(amount))
         
         transaction = Transaction(
             type="deposit",
@@ -240,7 +240,7 @@ def withdraw():
         if account.balance < amount:
             return jsonify({"detail": "Insufficient funds"}), 400
 
-        account.balance -= float(amount)
+        account.balance += Decimal(str(amount))
         
         transaction = Transaction(
             type="withdrawal",
@@ -387,8 +387,8 @@ def transfer():
             return jsonify({"detail": "Sender and receiver cannot be the same"}), 400
 
 
-        sender.balance -= float(amount)
-        receiver.balance += float(amount)
+        sender.balance -= Decimal(amount)
+        receiver.balance += Decimal(amount)
         
         transaction = Transaction(
             type="transfer",
@@ -422,12 +422,12 @@ def transfer():
         if sender_email:
             print(f"📧 Sending transfer email to {sender_email} with invoice attached")
 
-            send_email_async(
-                subject="Transfer Confirmation - Sent",
-                recipient=sender_email,
-                body=f"""
+        send_email_async(
+            subject="Transfer Confirmation - Sent",
+            recipient=sender_email,
+            body=f"""
                 Dear {current_user['username']},
-                
+        
                 Your transfer of ${amount} has been sent successfully.
                 Transaction ID: {transaction.id}
                 New Balance: ${sender.balance}
@@ -436,11 +436,12 @@ def transfer():
 
                 Thank you for using our service.
                 """,
-                attachment_path=invoice_path  # Attach invoice
+                attachment_path=invoice_path
             )
 
+
         # Send email to receiver
-        if receiver_user and receiver_user.get("email"):
+        if receiver_user and receiver_user.email:
             receiver_email = receiver_user.email
             print(f"📧 Sending transfer email to {receiver_email} with invoice attached")
 

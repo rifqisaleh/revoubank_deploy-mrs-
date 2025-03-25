@@ -84,7 +84,7 @@ def external_deposit():
             return jsonify({"detail": "User account not found"}), 404
 
         # Update balance
-        account.balance += float(amount)
+        account.balance += Decimal(str(amount))
 
         # Store transaction
         transaction = Transaction(
@@ -205,7 +205,7 @@ def external_withdraw():
             return jsonify({"detail": "Insufficient balance"}), 400
 
         # Update balance
-        account.balance -= float(amount)
+        account.balance += Decimal(str(amount))
 
         # Store transaction
         transaction = Transaction(
