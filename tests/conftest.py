@@ -1,11 +1,18 @@
 import pytest
-from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app import create_app, db, get_db
-from app.model.models import User, Account
+from contextlib import contextmanager
+
+from app import create_app, db
+from app.database import dependency as dependency_module
+import app.database.db as db_module
+from app.utils.user import hash_password
+
+from app.model.models import User, Account, Transaction, Bill, Budget
 
 TEST_DATABASE_URI = "sqlite:///:memory:"
+engine = create_engine(TEST_DATABASE_URI)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 @pytest.fixture(scope="session")
 def test_app():
@@ -22,31 +29,42 @@ def test_app():
         yield app
 
 def seed_test_data():
-    # Seed one user and account with all required fields
-    user = User(username="testuser", email="test@example.com", password="testpass")
+    user = User(
+    username="testuser",
+    email="test@example.com",
+    password=hash_password("testpass")  # ✅ hashed password
+)
     db.session.add(user)
     db.session.commit()
 
-    account = Account(
-        user_id=user.id,
-        account_type="savings",
-        balance=1000.0
-    )
+    account = Account(user_id=user.id, account_type="savings", balance=1000.0)
     db.session.add(account)
     db.session.commit()
 
+    transaction = Transaction(type="deposit", amount=100)
+    transaction.account = account  # ✅ Relationship-style assignment
+    db.session.add(transaction)
+
+    bill = Bill(amount=150.0, is_paid=False)
+    bill.user = user  # ✅ set via relationship
+    bill.title = "Electricity"  # <-- adjust to match actual column name if not `name`
+
+
+    budget = Budget(user_id=user.id, category="Groceries", amount=300.0)
+    db.session.add(budget)
+
+    db.session.commit()
+
+# ✅ Automatically override get_db + SessionLocal for all tests
 @pytest.fixture(autouse=True)
-def override_get_db(monkeypatch):
-    engine = create_engine(TEST_DATABASE_URI)
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
+def patch_db(monkeypatch):
     @contextmanager
-    def override():
-        db = TestingSessionLocal()
+    def override_get_db():
+        session = TestingSessionLocal()
         try:
-            yield db
+            yield session
         finally:
-            db.close()
+            session.close()
 
-    # ✅ Patch the real get_db function from your app/__init__.py
-    monkeypatch.setattr(get_db, "__code__", override.__code__)
+    monkeypatch.setattr("app.database.dependency.get_db", override_get_db)
+    db_module.SessionLocal = TestingSessionLocal

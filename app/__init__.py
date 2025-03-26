@@ -78,6 +78,7 @@ def create_app(test_config=None):
 })
 
     def login():
+        from app import get_db
         """
         Login. Authenticate user and generate JWT token
         ---

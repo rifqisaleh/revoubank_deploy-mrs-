@@ -5,7 +5,7 @@ from jose import JWTError, jwt
 from flask import request, jsonify, abort
 from dotenv import load_dotenv
 
-from app.model.base import get_db
+from app.database.dependency import get_db
 from app.model.models import User
 from app.utils.user import verify_password
 
@@ -28,8 +28,11 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 
 # Authenticate User (via DB)
-def authenticate_user(username: str, password: str):
-    db = next(get_db())
+def authenticate_user(username: str, password: str, db=None):
+    if db is None:
+        from app.database.dependency import get_db
+        db = next(get_db())
+
     user = db.query(User).filter_by(username=username).first()
     if not user:
         return None
@@ -83,15 +86,15 @@ def get_current_user():
     except JWTError:
         abort(401, description="Invalid token")
 
-    db = next(get_db())
-    user = db.query(User).filter_by(id=int(user_id)).first()
-    if not user:
-        abort(401, description="User not found")
+    with get_db() as db:
+        user = db.query(User).filter_by(id=int(user_id)).first()
+        if not user:
+            abort(401, description="User not found")
 
-    return {
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "full_name": user.full_name,
-        "phone_number": user.phone_number
-    }
+        return {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "full_name": user.full_name,
+            "phone_number": user.phone_number
+        }
