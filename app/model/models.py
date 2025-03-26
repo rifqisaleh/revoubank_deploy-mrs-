@@ -18,6 +18,7 @@ class User(db.Model):
     locked_time = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
 
 class Account(db.Model):
     __tablename__ = 'accounts'

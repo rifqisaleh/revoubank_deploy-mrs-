@@ -28,16 +28,15 @@ def get_db():
 # ✅ Flask app factory
 def create_app(test_config=None):
     app = Flask(__name__)
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
-    app.config.from_object(Config)
-    db.init_app(app)
-    migrate.init_app(app, db)
-    CORS(app)
     
     if test_config:
         app.config.update(test_config)
     else:
-        app.config.from_object(Config)    
+        app.config.from_object(Config)
+    
+    db.init_app(app)
+    migrate.init_app(app, db)
+    CORS(app)   
         
     
     # ✅ Register blueprints
