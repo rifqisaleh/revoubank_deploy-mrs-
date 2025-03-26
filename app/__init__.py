@@ -11,6 +11,7 @@ from flask_cors import CORS
 from contextlib import contextmanager
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flasgger import swag_from
 
 # Initialize Migrate object
 migrate = Migrate()
@@ -25,13 +26,19 @@ def get_db():
         db.close()
 
 # ✅ Flask app factory
-def create_app():
+def create_app(test_config=None):
     app = Flask(__name__)
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
     app.config.from_object(Config)
     db.init_app(app)
     migrate.init_app(app, db)
     CORS(app)
+    
+    if test_config:
+        app.config.update(test_config)
+    else:
+        app.config.from_object(Config)    
+        
     
     # ✅ Register blueprints
     from app.routes import users, accounts, transactions, external_transaction, billpayment, bills, budgets, categories
@@ -47,9 +54,33 @@ def create_app():
 
     # ✅ Login route inside app factory
     @app.route("/token", methods=["POST"])
+    @swag_from({
+        "tags": ["auth"],  # 👈 Change this line
+        "summary": "Login. Authenticate user and generate JWT token",
+        "parameters": [
+        {
+            "name": "username",
+            "in": "formData",
+            "type": "string",
+            "required": True
+        },
+        {
+            "name": "password",
+            "in": "formData",
+            "type": "string",
+            "required": True
+        }
+    ],
+        "responses": {
+            "200": {"description": "Returns access token"},
+            "400": {"description": "Incorrect username or password"},
+            "403": {"description": "Account is locked"}
+    }
+})
+
     def login():
         """
-        Authenticate user and generate JWT token
+        Login. Authenticate user and generate JWT token
         ---
         parameters:
           - name: username
@@ -129,5 +160,17 @@ def create_app():
             access_token = create_access_token(data={"sub": str(user.id)}, expires_delta=access_token_expires)
 
             return jsonify({"access_token": access_token, "token_type": "bearer"})
+
+    @app.route("/logout", methods=["POST"])
+    @swag_from({
+            "tags": ["auth"],
+            "summary": "Logout (client-side only)",
+            "description": "This route simply tells clients to delete the token. JWTs are stateless.",
+            "responses": {
+                "200": {"description": "Logout successful (token should be deleted client-side)"}
+            }
+            })
+    def logout():
+            return jsonify({"message": "Logout successful. Please delete your token on the client side."}), 200
 
     return app

@@ -167,7 +167,9 @@ def pay_bill_from_balance(bill_id):
             return jsonify({"detail": "Insufficient balance or no account found"}), 400
 
         # Deduct balance
-        account.balance -= bill.amount
+        if account.balance < Decimal(str(bill.amount)):
+            return jsonify({"detail": "Insufficient funds"}), 400
+        account.balance -= Decimal(str(bill.amount))
         bill.is_paid = True
 
         # Log transaction

@@ -1,22 +1,13 @@
-import os
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://username:password@localhost/revoubank")
-
-engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=False)  # Set to True if debugging
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
+from app.database.db import db
+from app.database.db import SessionLocal
 
 def get_db():
-    db = SessionLocal()
+    db_session = SessionLocal()
     try:
-        yield db
+        yield db_session
     finally:
-        db.close()
+        db_session.close()
 
 def create_tables():
-    from app.model.models import User, Account, Transaction
-    Base.metadata.create_all(bind=engine)
+    from app.model import models  # ensure models are loaded
+    db.create_all()

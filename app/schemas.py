@@ -1,7 +1,8 @@
 from pydantic import BaseModel, field_validator, EmailStr
+from pydantic.config import ConfigDict
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 
 
 # =============================
@@ -36,8 +37,7 @@ class UserResponse(BaseModel):
     full_name: Optional[str]
     phone_number: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # =============================
@@ -60,8 +60,7 @@ class AccountResponse(BaseModel):
     account_type: AccountType
     balance: Decimal
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # =============================
@@ -85,8 +84,7 @@ class TransactionCreate(BaseModel):
     def convert_to_uppercase(cls, v):
         return v.upper() if isinstance(v, str) else v
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TransactionResponse(BaseModel):
@@ -96,8 +94,7 @@ class TransactionResponse(BaseModel):
     amount: Decimal
     transaction_type: TransactionType
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # =============================
@@ -123,3 +120,59 @@ class BillPaymentWithCardCreate(BaseModel):
 class BillPaymentWithBalanceCreate(BaseModel):
     biller_name: str
     amount: Decimal
+
+
+# =============================
+# Bill Schemas
+# =============================
+
+class BillCreate(BaseModel):
+    biller_name: str
+    due_date: str
+    amount: Decimal
+    account_id: int
+
+
+class BillResponse(BaseModel):
+    id: int
+    user_id: int
+    biller_name: str
+    due_date: str
+    amount: Decimal
+    is_paid: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# =============================
+# Budget Schemas
+# =============================
+
+class BudgetCreate(BaseModel):
+    category: str
+    amount: Decimal
+    start_date: str
+    end_date: str
+
+
+class BudgetResponse(BaseModel):
+    id: int
+    user_id: int
+    category: str
+    amount: Decimal
+    start_date: str
+    end_date: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# =============================
+# Category Schemas
+# =============================
+
+class TransactionCategoryResponse(BaseModel):
+    id: int
+    user_id: int
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
