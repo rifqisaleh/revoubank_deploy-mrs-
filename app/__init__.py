@@ -9,6 +9,11 @@ from app.model.models import User
 from app.services.email.utils import send_email_async
 from flask_cors import CORS
 from contextlib import contextmanager
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+
+# Initialize Migrate object
+migrate = Migrate()
 
 # ✅ Context-managed DB session
 @contextmanager
@@ -25,15 +30,20 @@ def create_app():
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
     app.config.from_object(Config)
     db.init_app(app)
+    migrate.init_app(app, db)
     CORS(app)
     
     # ✅ Register blueprints
-    from app.routes import users, accounts, transactions, external_transaction, billpayment
+    from app.routes import users, accounts, transactions, external_transaction, billpayment, bills, budgets, categories
     app.register_blueprint(users.users_bp, url_prefix="/users")
     app.register_blueprint(accounts.accounts_bp, url_prefix="/accounts")
     app.register_blueprint(transactions.transactions_bp, url_prefix="/transactions")
     app.register_blueprint(external_transaction.external_transaction_bp)
     app.register_blueprint(billpayment.billpayment_bp)
+    app.register_blueprint(bills.bills_bp)
+    app.register_blueprint(budgets.budgets_bp)
+    app.register_blueprint(categories.categories_bp)
+
 
     # ✅ Login route inside app factory
     @app.route("/token", methods=["POST"])

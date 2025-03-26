@@ -1,7 +1,7 @@
 from app.database.db import db
 from datetime import datetime
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date, Boolean, DateTime
 from app.model.base import Base
 
 class User(db.Model):
@@ -65,4 +65,31 @@ class Transaction(db.Model):
             "payment_method": self.payment_method
         }
 
-    
+class Budget(db.Model):
+    __tablename__ = 'budgets'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    category = db.Column(db.String(50), nullable=False)
+    #name = Column(String(100), nullable=False)
+    amount = Column(Float, nullable=False)
+    start_date = Column(Date, nullable=True)
+    end_date = Column(Date, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class TransactionCategory(db.Model):
+    __tablename__ = 'transaction_categories'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    name = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Bill(db.Model):
+    __tablename__ = 'bills'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    biller_name = Column(String(100), nullable=False)
+    due_date = Column(Date, nullable=False)
+    amount = Column(Float, nullable=False)
+    account_id = Column(Integer, ForeignKey('accounts.id'), nullable=False)
+    is_paid = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

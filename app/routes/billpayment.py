@@ -7,11 +7,11 @@ from app.core.auth import get_current_user
 from app.utils.verification import verify_card_number
 from app.services.email.utils import send_email_async
 from app.services.invoice.invoice_generator import generate_invoice
-from app.model.models import Account, Transaction
+from app.model.models import Account, Transaction, Bill
 
-billpayment_bp = Blueprint('billpayment', __name__)
+billpayment_bp = Blueprint('billpayment', __name__, url_prefix="/bills")
 
-@billpayment_bp.route("/billpayment/card/", methods=["POST"])
+@billpayment_bp.route("/pay/card", methods=["POST"])
 @swag_from({
     "tags": ["bill payment"],
     "summary": "Pay a bill using a credit card",
@@ -128,7 +128,7 @@ def pay_bill_with_card():
 
 
 
-@billpayment_bp.route("/billpayment/balance/", methods=["POST"])
+@billpayment_bp.route("/<int:bill_id>/pay", methods=["POST"])
 @swag_from({
     "tags": ["bill payment"],
     "summary": "Pay a bill using account balance",
@@ -137,25 +137,11 @@ def pay_bill_with_card():
     "produces": ["application/json"],
     "parameters": [
         {
-            "in": "body",
-            "name": "body",
+            "name": "bill_id",
+            "in": "path",
+            "type": "integer",
             "required": True,
-            "schema": {
-                "type": "object",
-                "properties": {
-                    "biller_name": {
-                        "type": "string",
-                        "example": "Water Utility",
-                        "description": "The name of the biller"
-                    },
-                    "amount": {
-                        "type": "number",
-                        "example": 75.25,
-                        "description": "The amount to pay"
-                    }
-                },
-                "required": ["biller_name", "amount"]
-            }
+            "description": "The ID of the bill to pay"
         }
     ],
     "responses": {
@@ -165,39 +151,31 @@ def pay_bill_with_card():
     }
 })
 
-def pay_bill_with_balance():
+def pay_bill_from_balance(bill_id):
     db = next(get_db())
-
-    if not request.is_json:
-        return jsonify({"detail": "Unsupported Media Type"}), 415
-
     try:
-        data = request.get_json()
-        required_fields = {"biller_name", "amount"}
-
-        missing = required_fields - set(data.keys())
-        if missing:
-            return jsonify({"detail": f"Missing fields: {', '.join(missing)}"}), 400
-
-        amount = Decimal(data["amount"])
-        if amount <= 0:
-            return jsonify({"detail": "Amount must be greater than zero"}), 400
-
         current_user = get_current_user()
+
+        bill = db.query(Bill).filter_by(id=bill_id, user_id=current_user["id"]).first()
+        if not bill:
+            return jsonify({"detail": "Bill not found"}), 404
+        if bill.is_paid:
+            return jsonify({"detail": "Bill already paid"}), 400
+
         account = db.query(Account).filter_by(user_id=current_user["id"]).first()
+        if not account or account.balance < bill.amount:
+            return jsonify({"detail": "Insufficient balance or no account found"}), 400
 
-        if not account:
-            return jsonify({"detail": "User account not found"}), 404
-        if account.balance < amount:
-            return jsonify({"detail": "Insufficient balance"}), 400
+        # Deduct balance
+        account.balance -= bill.amount
+        bill.is_paid = True
 
-        account.balance += Decimal(str(amount))
-
+        # Log transaction
         transaction = Transaction(
             type="bill_payment",
-            amount=float(amount),
+            amount=float(bill.amount),
             sender_id=account.id,
-            biller_name=data["biller_name"],
+            biller_name=bill.biller_name,
             payment_method="account_balance"
         )
 
@@ -208,33 +186,33 @@ def pay_bill_with_balance():
         # Generate invoice
         invoice_filename = f"invoice_{transaction.id}.pdf"
         invoice_path = generate_invoice(
-            transaction_details=transaction.as_dict(),
-            filename=invoice_filename,
-            user=current_user
-        )
+                transaction_details=transaction.as_dict(),
+                filename=invoice_filename,
+                user=current_user
+            )
 
         # Send email
         send_email_async(
-            subject="Bill Payment Confirmation & Invoice",
-            recipient=current_user["email"],
-            body=f"""
-            Dear {current_user['username']},
+             subject="Bill Payment Confirmation & Invoice",
+             recipient=current_user["email"],
+             body=f"""
+                Dear {current_user['username']},
 
-            Your bill payment of ${amount} to {data['biller_name']} using your account balance has been processed.
-            Transaction ID: {transaction.id}
+                Your bill payment of ${bill.amount} to {bill.biller_name} using your account balance has been processed.
+                Transaction ID: {transaction.id}
 
-            Please find your invoice attached.
+                Please find your invoice attached.
 
-            Thank you for using RevouBank.
-            """,
-            attachment_path=invoice_path
-        )
+                Thank you for using RevouBank.
+                """,
+             attachment_path=invoice_path
+            )
 
         return jsonify({
-            "message": f"Successfully paid ${amount} to {data['biller_name']} from account balance",
-            "transaction_id": transaction.id,
-            "balance": account.balance
-        })
+                "message": f"Successfully paid ${bill.amount} to {bill.biller_name} from account balance",
+                "transaction_id": transaction.id,
+                "balance": account.balance
+            })
 
     except Exception as e:
         db.rollback()
