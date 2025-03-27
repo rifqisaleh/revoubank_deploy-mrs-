@@ -52,6 +52,7 @@ class AccountType(str, Enum):
 class AccountCreate(BaseModel):
     account_type: AccountType
     initial_balance: Decimal = Decimal(0)
+    account_number: str
 
 
 class AccountResponse(BaseModel):
@@ -59,7 +60,7 @@ class AccountResponse(BaseModel):
     user_id: int
     account_type: AccountType
     balance: Decimal
-
+    account_number: str
     model_config = ConfigDict(from_attributes=True)
 
 

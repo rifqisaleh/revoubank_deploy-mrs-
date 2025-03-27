@@ -1,70 +1,98 @@
 import pytest
+from app import create_app
+from app.model.models import db as _db, User, Account, Transaction
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from contextlib import contextmanager
+from sqlalchemy.pool import StaticPool
 
-from app import create_app, db
-from app.database import dependency as dependency_module
-import app.database.db as db_module
-from app.utils.user import hash_password
+# Use in-memory SQLite for fast and isolated tests
+TEST_DATABASE_URL = "sqlite:///:memory:"
 
-from app.model.models import User, Account, Transaction, Bill, Budget
+import pytest
 
-TEST_DATABASE_URI = "sqlite:///:memory:"
-engine = create_engine(TEST_DATABASE_URI)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# If your existing client fixture is named `client`
+@pytest.fixture
+def test_app(client):
+    return client
+
+@pytest.fixture
+def test_client(client):
+    return client
+
 
 @pytest.fixture(scope="session")
-def test_app():
-    class TestConfig:
-        TESTING = True
-        SQLALCHEMY_DATABASE_URI = TEST_DATABASE_URI
-        SQLALCHEMY_TRACK_MODIFICATIONS = False
-
-    app = create_app(test_config=TestConfig.__dict__)
+def app():
+    app = create_app()
+    app.config.update({
+        "TESTING": True,
+        "SQLALCHEMY_DATABASE_URI": TEST_DATABASE_URL,
+        "SQLALCHEMY_TRACK_MODIFICATIONS": False,
+    })
 
     with app.app_context():
-        db.create_all()
-        seed_test_data()
         yield app
 
-def seed_test_data():
-    user = User(
-    username="testuser",
-    email="test@example.com",
-    password=hash_password("testpass")  # ✅ hashed password
-)
-    db.session.add(user)
-    db.session.commit()
+@pytest.fixture(scope="session")
+def test_engine():
+    engine = create_engine(
+        TEST_DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool
+    )
+    return engine
 
-    account = Account(user_id=user.id, account_type="savings", balance=1000.0)
-    db.session.add(account)
-    db.session.commit()
+@pytest.fixture(scope="session")
+def tables(test_engine):
+    _db.metadata.create_all(bind=test_engine)
+    yield
+    _db.metadata.drop_all(bind=test_engine)
 
-    transaction = Transaction(type="deposit", amount=100)
-    transaction.account = account  # ✅ Relationship-style assignment
-    db.session.add(transaction)
+@pytest.fixture
+def test_db(test_engine, tables):
+    """Create a new database session for a test."""
+    connection = test_engine.connect()
+    transaction = connection.begin()
 
-    bill = Bill(amount=150.0, is_paid=False)
-    bill.user = user  # ✅ set via relationship
-    bill.title = "Electricity"  # <-- adjust to match actual column name if not `name`
+    session = sessionmaker(bind=connection)()
+    yield session
 
+    session.close()
+    transaction.rollback()
+    connection.close()
 
-    budget = Budget(user_id=user.id, category="Groceries", amount=300.0)
-    db.session.add(budget)
+@pytest.fixture
+def client(app, test_db, monkeypatch):
+    """
+    Flask test client with test DB injected into the app context.
+    """
+    # Patch get_db to return our test_db session
+    from app.routes import transactions
 
-    db.session.commit()
+    def get_test_db():
+        yield test_db
 
-# ✅ Automatically override get_db + SessionLocal for all tests
-@pytest.fixture(autouse=True)
-def patch_db(monkeypatch):
-    @contextmanager
-    def override_get_db():
-        session = TestingSessionLocal()
-        try:
-            yield session
-        finally:
-            session.close()
+    monkeypatch.setattr(transactions, "get_db", get_test_db)
 
-    monkeypatch.setattr("app.database.dependency.get_db", override_get_db)
-    db_module.SessionLocal = TestingSessionLocal
+    with app.test_client() as client:
+        yield client
+
+# Optional fixture to insert test data
+def seed_test_data(session):
+    user = User(id=1, username="testuser", email="test@example.com", password="hashed")
+    account = Account(id=1, user_id=1, balance=1000)
+    transaction = Transaction(id=1, account_id=1, type="deposit", amount=500)
+
+    session.add_all([user, account, transaction])
+    session.commit()
+
+@pytest.fixture
+def seeded_db(test_db):
+    seed_test_data(test_db)
+    return test_db
+
+@pytest.fixture(scope="function")
+def init_database(test_engine, test_db):
+    _db.metadata.create_all(bind=test_engine)
+    yield
+    test_db.rollback()
+    _db.metadata.drop_all(bind=test_engine)

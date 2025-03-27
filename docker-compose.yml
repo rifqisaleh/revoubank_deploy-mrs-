@@ -1,6 +1,16 @@
 version: '3.8'
 
 services:
+  web:
+    build: .
+    container_name: revoubank-web
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres
+
   postgres:
     image: postgres:15
     container_name: revoubank-db

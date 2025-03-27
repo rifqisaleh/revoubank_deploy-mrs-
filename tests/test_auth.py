@@ -1,14 +1,26 @@
 import pytest
 from app.core.auth import authenticate_user
+from app.utils.user import hash_password
+from app.model.models import User  # Import the User class
 
-def test_authenticate_valid_user(test_app):
-    from app import db
-    user = authenticate_user("testuser", "testpass", db.session)
-    assert user["username"] == "testuser"
+def test_authenticate_valid_user(test_db):
+    user = User(
+        username="testuser",
+        password=hash_password("testpass"),
+        email="test@example.com",
+        full_name="Test User",
+        phone_number="123456789"
+    )
+    test_db.add(user)
+    test_db.commit()
+
+    result = authenticate_user("testuser", "testpass", test_db)
+    assert result is not None
+    assert result["username"] == "testuser"
 
 
-def test_authenticate_invalid_user(test_app):
-    from app import db
-    user = authenticate_user("nonexistent", "wrongpass", db.session)
-    assert user is None
+def test_authenticate_invalid_user(test_db):
+    from app.core.auth import authenticate_user
 
+    result = authenticate_user("wronguser", "wrongpass", test_db)
+    assert result is None
