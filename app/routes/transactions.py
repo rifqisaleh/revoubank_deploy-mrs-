@@ -516,18 +516,27 @@ def list_transactions():
 })
 
 def get_transaction_for_user(id):
-    """Fetches a specific transaction by ID."""
+    """Fetches a specific transaction by user ID."""
     current_user = get_current_user()
     if not current_user or current_user["id"] != id:
         return jsonify({"detail": "Unauthorized"}), 401
 
     db = next(get_db())
+
+    # 🔍 DEBUG: Show all account IDs for the user
+    accounts = db.query(Account).filter_by(user_id=id).all()
+    account_ids = [acc.id for acc in accounts]
+    print("🔍 Account IDs for User", id, ":", account_ids)
+
+    # 🔍 DEBUG: Show matching transactions
     transactions = db.query(Transaction).filter(
-        (Transaction.sender_id == id) | 
-        (Transaction.receiver_id == id)
+        (Transaction.sender_id.in_(account_ids)) |
+        (Transaction.receiver_id.in_(account_ids))
     ).all()
+    print("🔍 Transactions found:", transactions)
 
     return jsonify([t.as_dict() for t in transactions])
+
 
 
 @transactions_bp.route('/check-balance/', methods=['GET'])
