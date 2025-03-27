@@ -1,5 +1,5 @@
 import pytest
-from datetime import date
+from datetime import date, datetime, timezone  # Updated import
 from app.model.models import User, Account, Transaction, Budget, TransactionCategory, Bill
 
 @pytest.fixture
@@ -35,8 +35,8 @@ def new_budget(new_user):
         user_id=new_user.id,
         category="Groceries",
         amount=200.0,
-        start_date=date.today(),
-        end_date=date.today()
+        start_date=datetime.now(timezone.utc),  # Updated to use timezone-aware datetime
+        end_date=datetime.now(timezone.utc)    # Updated to use timezone-aware datetime
     )
 
 @pytest.fixture
@@ -51,7 +51,7 @@ def new_bill(new_user, new_account):
     return Bill(
         user_id=new_user.id,
         biller_name="Electric Co.",
-        due_date=date.today(),
+        due_date=datetime.now(timezone.utc),  # Updated to use timezone-aware datetime
         amount=75.0,
         account_id=new_account.id
     )

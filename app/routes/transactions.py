@@ -528,18 +528,18 @@ def list_transactions():
     'security': [{"Bearer": []}]  # 🔒 Require authentication
 })
 
-def get_transaction_for_user(id):
+def get_transaction_for_user(user_id):
     """Fetches a specific transaction by user ID."""
     current_user = get_current_user()
-    if not current_user or current_user["id"] != id:
+    if not current_user or current_user["id"] != user_id:
         return jsonify({"detail": "Unauthorized"}), 401
 
     db = next(get_db())
 
     # 🔍 DEBUG: Show all account IDs for the user
-    accounts = db.query(Account).filter_by(user_id=id).all()
+    accounts = db.query(Account).filter_by(user_id=user_id).all()
     account_ids = [acc.id for acc in accounts]
-    print("🔍 Account IDs for User", id, ":", account_ids)
+    print("🔍 Account IDs for User", user_id, ":", account_ids)
 
     # 🔍 DEBUG: Show matching transactions
     transactions = db.query(Transaction).filter(
