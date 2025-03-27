@@ -8,6 +8,7 @@ from decimal import Decimal
 from datetime import datetime
 from app.services.email.utils import send_email_async
 from app.services.invoice.invoice_generator import generate_invoice
+from uuid import uuid4
 
 accounts_bp = Blueprint('accounts', __name__)
 
@@ -43,12 +44,23 @@ accounts_bp = Blueprint('accounts', __name__)
         }
     ],
     "responses": {
-        "201": {"description": "Account created successfully"},
+        "201": {
+            "description": "Account created successfully",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer", "example": 1},
+                    "user_id": {"type": "integer", "example": 1},
+                    "account_type": {"type": "string", "example": "savings"},
+                    "balance": {"type": "number", "example": 1000.00},
+                    "account_number": {"type": "string", "example": "a8efa499-7"}
+                }
+            }
+        },
         "401": {"description": "Unauthorized"},
         "404": {"description": "User not found"}
     }
 })
-
 def create_account():
     if not request.is_json:
         return make_response(jsonify({"detail": "Unsupported Media Type"}), 415)
@@ -64,7 +76,8 @@ def create_account():
         new_account = Account(
             user_id=current_user["id"],
             account_type=account_data.account_type.value,
-            balance=Decimal(str(account_data.initial_balance))
+            balance=Decimal(str(account_data.initial_balance)),
+            account_number=uuid4().hex[:10]  # <-- Generate account number
         )
 
         db.session.add(new_account)
@@ -74,11 +87,13 @@ def create_account():
             id=new_account.id,
             user_id=new_account.user_id,
             account_type=new_account.account_type,
-            balance=float(new_account.balance)
+            balance=float(new_account.balance),
+            account_number=new_account.account_number  # <-- Include account_number in the response
         ).dict()), 201
 
     except Exception as e:
         return make_response(jsonify({"detail": str(e)}), 400)
+
 
 @accounts_bp.route("/", methods=["GET"])
 @swag_from({
@@ -108,7 +123,8 @@ def list_accounts():
                 id=acc.id,
                 user_id=acc.user_id,
                 account_type=acc.account_type,
-                balance=float(acc.balance)
+                balance=float(acc.balance),
+                account_number=acc.account_number
             ).dict()
             for acc in accounts
         ])
@@ -129,28 +145,28 @@ def list_accounts():
         404: {'description': 'Account not found or unauthorized'}
     }
 })
-
 def get_account(id):
     """Fetches details of a specific account for the authenticated user."""
     current_user = get_current_user()
     if not current_user:
         return make_response(jsonify({"detail": "Unauthorized"}), 401)
-    
+
     try:
         account = Account.query.filter_by(
             id=id,
             user_id=current_user["id"],
             is_deleted=False
         ).first()
-        
+
         if not account:
             return make_response(jsonify({"detail": "Account not found or unauthorized"}), 404)
-        
+
         return jsonify(AccountResponse(
             id=account.id,
             user_id=account.user_id,
             account_type=account.account_type,
-            balance=float(account.balance)
+            balance=float(account.balance),
+            account_number=account.account_number 
         ).dict())
     except Exception as e:
         return make_response(jsonify({"detail": str(e)}), 500)

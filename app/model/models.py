@@ -1,7 +1,8 @@
 from app.database.db import db
 from datetime import datetime
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date, Boolean, DateTime, event
+import uuid
 #from app.model.base import Base
 
 class User(db.Model):
@@ -31,8 +32,15 @@ class Account(db.Model):
     is_deleted = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     user = db.relationship('User', backref=db.backref('accounts', lazy=True))
+
+    # Ensure account_number is populated before insert
+@event.listens_for(Account, 'before_insert')
+def generate_account_number(mapper, connection, target):
+    if target.account_number is None:
+        target.account_number = str(uuid.uuid4())[:10]  # Generate a 10-character account number
+
     
 class Transaction(db.Model):
     __tablename__ = 'transactions'
