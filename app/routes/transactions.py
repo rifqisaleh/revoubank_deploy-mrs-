@@ -484,20 +484,33 @@ def transfer():
     },
     'security': [{"Bearer": []}]  # 🔒 Require authentication
 })
+
 def list_transactions():
-    """Fetches all transactions for the authenticated user."""
     current_user = get_current_user()
+    print("🔑 Current User:", current_user)
+
     if not current_user:
         return jsonify({"detail": "Unauthorized"}), 401
 
     db = next(get_db())
+
+    # Get the user's accounts
+    accounts = db.query(Account).filter_by(user_id=current_user["id"]).all()
+    account_ids = [acc.id for acc in accounts]
+    print("🔍 Account IDs for User", current_user["id"], ":", account_ids)
+
+    if not account_ids:
+        return jsonify([])
+
+    # Fix: Ensure the query properly fetches transactions for both sender and receiver
     transactions = db.query(Transaction).filter(
-        (Transaction.sender_id == current_user["id"]) | 
-        (Transaction.receiver_id == current_user["id"])
-    ).all()
+        (Transaction.sender_id.in_(account_ids)) | 
+        (Transaction.receiver_id.in_(account_ids))
+    ).order_by(Transaction.timestamp.desc()).all()  # Sort by timestamp for clarity
 
-    print("🔍 All Transactions:", transactions)  # Debugging
+    print("🔍 Found Transactions:", [t.id for t in transactions])
 
+    # Ensure transactions are serialized properly
     return jsonify([t.as_dict() for t in transactions])
 
 @transactions_bp.route('/<int:user_id>', methods=['GET'])
