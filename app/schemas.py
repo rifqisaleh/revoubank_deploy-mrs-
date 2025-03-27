@@ -52,7 +52,7 @@ class AccountType(str, Enum):
 class AccountCreate(BaseModel):
     account_type: AccountType
     initial_balance: Decimal = Decimal(0)
-    account_number: str
+    account_number: Optional[str] = None
 
 
 class AccountResponse(BaseModel):
