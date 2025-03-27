@@ -6,7 +6,7 @@ RevouBank API is a RESTful banking system that provides user management, account
 Note: Due to mailtrap limit, the email and invoice generator are in mock.
 
 To access api docs using Swagger/Flask, visit this link:
-<br> https://curious-sher-mrifqiprojects-d23b26ed.koyeb.app/docs
+<br> https://final-jacklyn-mrifqiprojects-728a1fab.koyeb.app/docs
 <br> http://127.0.0.1:5000/docs (Local)
 
 ## Features Implemented
@@ -53,10 +53,10 @@ MAIL_PORT=2525
 MAIL_USE_TLS=True
 MAIL_USE_SSL=False
 MAIL_USERNAME=revoubank@mail.com # currently inactive
-MAIL_PASSWORD=868F26B2C069F91114EF706D672C49582F25 # currently inactive
+MAIL_PASSWORD= # currently inactive
 MAIL_DEFAULT_SENDER=revoubank@mail.com # currently inactive
 SECRET_KEY=your-secret-key
-DATABASE_URL=mock
+DATABASE_URL=
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 

@@ -515,16 +515,16 @@ def list_transactions():
     'security': [{"Bearer": []}]  # 🔒 Require authentication
 })
 
-def get_transaction_for_user(User_id):
+def get_transaction_for_user(id):
     """Fetches a specific transaction by ID."""
     current_user = get_current_user()
-    if not current_user or current_user["id"] != User_id:
+    if not current_user or current_user["id"] != id:
         return jsonify({"detail": "Unauthorized"}), 401
 
     db = next(get_db())
     transactions = db.query(Transaction).filter(
-        (Transaction.sender_id == User_id) | 
-        (Transaction.receiver_id == User_id)
+        (Transaction.sender_id == id) | 
+        (Transaction.receiver_id == id)
     ).all()
 
     return jsonify([t.as_dict() for t in transactions])
