@@ -500,7 +500,7 @@ def list_transactions():
 
     return jsonify([t.as_dict() for t in transactions])
 
-@transactions_bp.route('/<int:id>', methods=['GET'])
+@transactions_bp.route('/<int:user_id>', methods=['GET'])
 @swag_from({
     'tags': ['transactions'],
     'summary': 'Retrieve transaction by ID',
@@ -515,22 +515,19 @@ def list_transactions():
     'security': [{"Bearer": []}]  # 🔒 Require authentication
 })
 
-def get_transaction(id):
+def get_transaction_for_user(User_id):
     """Fetches a specific transaction by ID."""
     current_user = get_current_user()
-    if not current_user:
+    if not current_user or current_user["id"] != User_id:
         return jsonify({"detail": "Unauthorized"}), 401
 
-    print("🔍 Checking transaction ID:", id)  # Debugging
-
     db = next(get_db())
-    transaction = db.query(Transaction).filter_by(id=id).first()
+    transactions = db.query(Transaction).filter(
+        (Transaction.sender_id == User_id) | 
+        (Transaction.receiver_id == User_id)
+    ).all()
 
-    if not transaction:
-        print("❌ Transaction Not Found!")
-        return jsonify({"detail": "Transaction not found"}), 404
-
-    return jsonify(transaction.as_dict())
+    return jsonify([t.as_dict() for t in transactions])
 
 
 @transactions_bp.route('/check-balance/', methods=['GET'])
