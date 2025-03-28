@@ -1,5 +1,23 @@
 # RevouBank API
 
+
+
+
+## Directory
+
+- [🔹 Overview](#overview)
+- [🔹 Features Implemented](#features-implemented)
+- [🔹 Installation and Setup](#installation-and-setup)
+- [🔹 API Access Rundown](#api-access-rundown)
+- [🔹 API Usage](#api-usage)
+  - [Authentication](#authentication)
+  - [Account Management](#account-management)
+  - [Transactions](#transactions)
+- [🔹 Testing Setup & Safety Notes](#testing-setup--safety-notes)
+- [🔹 Deployment](#deployment)
+
+
+
 ## Overview
 RevouBank API is a RESTful banking system that provides user management, account management, and transaction management functionalities. It is designed to simulate real-world banking operations with security enhancements such as account locking after failed login attempts, email notifications, and invoice generation. 
 
@@ -44,18 +62,26 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```sh
 uv pip install -r requirements.txt
 ```
+or
+
+```
+uv sync
+```
 
 ### Configure Environment Variables
+
+*Note: Delete all MAIL_ if you decide not to use SMTP (email). Only keep MOCK_EMAIL*
+
 Create a `.env` file in the project root and add the following:
 ```env
 MOCK_EMAIL=True
-MAIL_SERVER=smtp.elasticemail.com
-MAIL_PORT=2525
-MAIL_USE_TLS=True
-MAIL_USE_SSL=False
-MAIL_USERNAME=revoubank@mail.com # currently inactive
-MAIL_PASSWORD= # currently inactive
-MAIL_DEFAULT_SENDER=revoubank@mail.com # currently inactive
+MAIL_SERVER=
+MAIL_PORT=
+MAIL_USE_TLS=
+MAIL_USE_SSL=
+MAIL_USERNAME=
+MAIL_PASSWORD= 
+MAIL_DEFAULT_SENDER=
 SECRET_KEY=your-secret-key
 DATABASE_URL=
 ACCESS_TOKEN_EXPIRE_MINUTES=30
@@ -215,15 +241,73 @@ You can now access and test all authorized endpoints in the API.
   "new_balance": 1500.00
 }
 ```
+<br> <br>
 
-### Running Tests
-To run unit tests using pytest:
-```sh
+##  Testing Setup & Safety Notes
+
+To ensure tests do **not affect the production database**, a dedicated test environment is configured using an in-memory SQLite database. Below are the key points regarding testing and isolation.
+
+<br>
+
+###  1. `.env.test` is available for safe testing
+
+A `.env.test` file is provided in the project root, which sets the test environment:
+
+```env
+FLASK_ENV=test
+TESTING=True
+DATABASE_URL=sqlite:///:memory:
+```
+
+This configuration ensures that all tests use an **in-memory SQLite database**, which is created fresh on every test run and discarded afterward.
+
+<br>
+
+### 2. Safety Assertion in `conftest.py`
+
+The test configuration includes a fail-safe in `conftest.py`:
+
+```python
+assert "sqlite" in db_url, f"❌ NOT using a test database! Current DATABASE_URL: {db_url}"
+```
+
+This stops the test immediately if the app is connected to a non-test database (e.g., Supabase), preventing unintended changes to production data.
+
+<br>
+
+### 3. Running tests safely
+
+#### First-time test run with override (recommended for safety):
+
+```bash
+DATABASE_URL=sqlite:///:memory: pytest --maxfail=1
+```
+
+This command forces the test database to use SQLite and stops at the first failure, allowing you to verify the setup without running the full test suite.
+
+#### If the assertion passes or you've fixed the config:
+
+You can safely run the full suite with either:
+
+```bash
+DATABASE_URL=sqlite:///:memory: pytest
+```
+
+or simply:
+
+```bash
 pytest
 ```
 
-### Deployment
+(as long as `.env.test` is loaded properly and no conflicting `DATABASE_URL` is active in your shell)
+
+
+<br> <br>
+
+## Deployment
 The RevouBank API is deployed on **Koyeb**.
+
+<br> https://final-jacklyn-mrifqiprojects-728a1fab.koyeb.app/docs
 
 ---
 

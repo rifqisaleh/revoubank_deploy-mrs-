@@ -1,3 +1,13 @@
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env.test
+load_dotenv(dotenv_path=".env.test", override=True)
+
+# ✅ Abort early if not using test DB
+db_url = os.getenv("DATABASE_URL", "")
+assert "sqlite" in db_url, f"❌ NOT using a test database! Current DATABASE_URL: {db_url}"
+
 import pytest
 from app import create_app
 from app.model.models import db as _db, User, Account, Transaction
@@ -6,24 +16,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.sql import text
 
-# Use in-memory SQLite for fast and isolated tests
+# Use in-memory SQLite for test database
 TEST_DATABASE_URL = "sqlite:///:memory:"
-
-@pytest.fixture
-def clean_db(seeded_db):  # Remove autouse=True
-    seeded_db.execute(text("DELETE FROM accounts"))
-    seeded_db.execute(text("DELETE FROM users"))
-    seeded_db.commit()
-
-
-@pytest.fixture
-def test_app(client):
-    return client
-
-@pytest.fixture
-def test_client(client):
-    return client
-
 
 @pytest.fixture(scope="session")
 def app():
@@ -36,6 +30,7 @@ def app():
 
     with app.app_context():
         yield app
+
 
 @pytest.fixture(scope="session")
 def test_engine():
@@ -54,13 +49,10 @@ def tables(test_engine):
 
 @pytest.fixture
 def test_db(test_engine, tables):
-    """Create a new database session for a test."""
     connection = test_engine.connect()
     transaction = connection.begin()
-
     session = sessionmaker(bind=connection)()
     yield session
-
     session.close()
     transaction.rollback()
     connection.close()
@@ -68,7 +60,7 @@ def test_db(test_engine, tables):
 @pytest.fixture
 def client(app, test_db, monkeypatch):
     """
-    Flask test client with test DB injected into the app context.
+    Flask test client with test DB injected.
     """
     from app.routes import transactions
 
@@ -80,7 +72,6 @@ def client(app, test_db, monkeypatch):
     with app.test_client() as client:
         yield client
 
-
 # ✅ Fixed seed function
 def seed_test_data(session):
     user = User(id=1, username="testuser", email="test@example.com", password="hashed")
@@ -88,16 +79,15 @@ def seed_test_data(session):
         id=1,
         user_id=1,
         balance=1000,
-        account_type="savings",          # ensure matches your model definition
+        account_type="savings",
         account_number="1234567890"
     )
     transaction = Transaction(
         id=1,
-        sender_id=1,                     # ✅ replaces invalid account_id
+        sender_id=1,
         type="deposit",
         amount=500
     )
-
     session.add_all([user, account, transaction])
     session.commit()
 
@@ -112,3 +102,17 @@ def init_database(test_engine, test_db):
     yield
     test_db.rollback()
     _db.metadata.drop_all(bind=test_engine)
+
+@pytest.fixture
+def clean_db(seeded_db):
+    seeded_db.execute(text("DELETE FROM accounts"))
+    seeded_db.execute(text("DELETE FROM users"))
+    seeded_db.commit()
+
+@pytest.fixture
+def test_app(client):
+    return client
+
+@pytest.fixture
+def test_client(client):
+    return client
