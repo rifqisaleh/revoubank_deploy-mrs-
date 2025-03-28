@@ -18,12 +18,13 @@ To access api docs using Swagger/Flask, visit this link:
   - Email notifications for authentication and transactions
   - Invoice generation for transactions
 - **Testing**: Unit tests using pytest.
-- **CI/CD**: GitHub Actions for automated deployment on Koyeb.
+
+<br> <br>
 
 ## Installation and Setup
 
 ### Prerequisites
-- Python 3.11
+- Python 3.12
 - `uv` package manager (or `pip` if preferred)
 - WSL (for Windows users)
 
@@ -62,12 +63,77 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 ### Start the Server
 ```sh
-python -m app.app 
+python -m app.app  /  uv python -m app.app (if using uv)
 ```
 Or
 ```sh
 FLASK_APP=app/app.py flask run --debug
 ```
+
+<br> <br>
+
+## API Access Rundown
+
+Before using any protected endpoints in this API, authentication is **required**. Follow the steps below to get started:
+
+
+
+### 1. Register a New User
+
+- Navigate to the `users` section.
+- Use the `POST /users/` endpoint to register a new user.
+- Example request body (feel free to edit as needed):
+
+```json
+{
+  "username": "your_username",
+  "email": "your_email@example.com",
+  "password": "your_secure_password"
+}
+```
+
+
+### 2. Login to Obtain Token
+
+- Go to the `auth` section.
+- Use the `POST /token` endpoint with the registered username and password.
+
+
+
+### 3. Copy the Access Token
+
+- If login is successful (HTTP 200), the response will look like this:
+
+```json
+{
+  "access_token": "your.jwt.access.token.here",
+  "token_type": "bearer"
+}
+```
+
+- Copy the value of `access_token`.
+
+
+
+### 4. Authorize with the Token
+
+- Scroll to the top-right corner of the Swagger page.
+- Click on the **Authorize** button.
+- Paste the token in the following format:
+
+```
+Bearer your.jwt.access.token.here
+```
+
+- Click **Authorize** to apply the token to all secured endpoints.
+
+
+### 5. You're Ready!
+
+You can now access and test all authorized endpoints in the API.
+
+<br> <br>
+
 
 ## API Usage
 
