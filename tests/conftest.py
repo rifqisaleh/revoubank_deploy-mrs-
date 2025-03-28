@@ -4,13 +4,18 @@ from app.model.models import db as _db, User, Account, Transaction
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from sqlalchemy.sql import text
 
 # Use in-memory SQLite for fast and isolated tests
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
-import pytest
+@pytest.fixture
+def clean_db(seeded_db):  # Remove autouse=True
+    seeded_db.execute(text("DELETE FROM accounts"))
+    seeded_db.execute(text("DELETE FROM users"))
+    seeded_db.commit()
 
-# If your existing client fixture is named `client`
+
 @pytest.fixture
 def test_app(client):
     return client
@@ -65,7 +70,6 @@ def client(app, test_db, monkeypatch):
     """
     Flask test client with test DB injected into the app context.
     """
-    # Patch get_db to return our test_db session
     from app.routes import transactions
 
     def get_test_db():
@@ -76,11 +80,23 @@ def client(app, test_db, monkeypatch):
     with app.test_client() as client:
         yield client
 
-# Optional fixture to insert test data
+
+# ✅ Fixed seed function
 def seed_test_data(session):
     user = User(id=1, username="testuser", email="test@example.com", password="hashed")
-    account = Account(id=1, user_id=1, balance=1000)
-    transaction = Transaction(id=1, account_id=1, type="deposit", amount=500)
+    account = Account(
+        id=1,
+        user_id=1,
+        balance=1000,
+        account_type="savings",          # ensure matches your model definition
+        account_number="1234567890"
+    )
+    transaction = Transaction(
+        id=1,
+        sender_id=1,                     # ✅ replaces invalid account_id
+        type="deposit",
+        amount=500
+    )
 
     session.add_all([user, account, transaction])
     session.commit()

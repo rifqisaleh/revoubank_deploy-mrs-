@@ -240,7 +240,7 @@ def withdraw():
         if account.balance < amount:
             return jsonify({"detail": "Insufficient funds"}), 400
 
-        account.balance += Decimal(str(amount))
+        account.balance -= Decimal(str(amount))
         
         transaction = Transaction(
             type="withdrawal",

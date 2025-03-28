@@ -20,6 +20,12 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    accounts = db.relationship(
+    "Account",
+    back_populates="user",
+    cascade="all, delete-orphan"
+)
+
 
 class Account(db.Model):
     __tablename__ = 'accounts'
@@ -33,7 +39,11 @@ class Account(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    user = db.relationship('User', backref=db.backref('accounts', lazy=True))
+    user = db.relationship(
+    "User",
+    back_populates="accounts"
+)
+
 
     # Ensure account_number is populated before insert
 @event.listens_for(Account, 'before_insert')
@@ -103,3 +113,6 @@ class Bill(db.Model):
     account_id = Column(Integer, ForeignKey('accounts.id'), nullable=False)
     is_paid = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    
+    account = db.relationship('Account', backref='bills', cascade="all, delete-orphan", single_parent=True)
