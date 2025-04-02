@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, abort
+from flask_jwt_extended import get_jwt_identity
 from flasgger.utils import swag_from
 from pydantic import BaseModel, ValidationError
 from typing import Optional
@@ -115,8 +116,8 @@ def register_user():
 })
 
 def list_users():
-    current_user = get_current_user()
-    if not current_user:
+    user_id = get_jwt_identity()
+    if not user_id:
         abort(401, description="Unauthorized")
 
     users = User.query.all()
@@ -142,8 +143,8 @@ def list_users():
     
 def get_profile():
     """Retrieves the profile of the currently authenticated user."""
-    current_user = get_current_user()
-    if not current_user:
+    user_id = get_jwt_identity()
+    if not user_id:
         abort(401, description="Unauthorized")
     
     user = User.query.get(get_current_user()["id"])
@@ -195,13 +196,13 @@ def update_profile():
     if not request.is_json:
         return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
 
-    current_user = get_current_user()
-    if not current_user:
+    user_id = get_jwt_identity()
+    if not user_id:
         return jsonify({"detail": "Unauthorized"}), 401
 
     try:
         updated_user = UserCreate(**request.get_json())
-        user = User.query.get(current_user["id"])
+        user = User.query.get(user_id)
 
         if not user:
             return jsonify({"detail": "User not found"}), 404
@@ -250,9 +251,13 @@ def update_profile():
 })
 
 def delete_user(user_id):
-    current_user = get_current_user()
-    if not current_user:
+    auth_user = get_current_user()
+    
+    if not auth_user:
         abort(401, description="Unauthorized")
+
+    if auth_user["id"] != user_id:
+        abort(403, description="Forbidden: You can only delete your own account")
 
     user = User.query.get(user_id)
     if not user:

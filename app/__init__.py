@@ -1,12 +1,13 @@
 import os
 from flask import Flask, request, jsonify
 from datetime import timedelta, datetime
-from app.core.auth import authenticate_user, create_access_token
+from flask_jwt_extended import create_access_token, JWTManager
 from config import Config
 from app.utils.user import verify_password
 from app.database.db import db, SessionLocal
 from app.model.models import User
 from app.services.email.utils import send_email_async
+from app.core.auth import generate_access_token
 from flask_cors import CORS
 from contextlib import contextmanager
 from flask_sqlalchemy import SQLAlchemy
@@ -15,6 +16,7 @@ from flasgger import swag_from
 
 # Initialize Migrate object
 migrate = Migrate()
+jwt = JWTManager()
 
 # ✅ Context-managed DB session
 @contextmanager
@@ -34,6 +36,8 @@ def create_app(test_config=None):
     else:
         app.config.from_object(Config)
     
+    app.config["JWT_SECRET_KEY"] = "1d7b852e9664c5b1178f5cfb314e612d2cf96646e6eaa30a2348193cf9e49559"
+    jwt.init_app(app)
     db.init_app(app)
     migrate.init_app(app, db)
     CORS(app)   
@@ -156,10 +160,10 @@ def create_app(test_config=None):
             user.locked_time = None
             db.commit()
 
-            access_token_expires = timedelta(minutes=Config.ACCESS_TOKEN_EXPIRE_MINUTES)
-            access_token = create_access_token(data={"sub": str(user.id)}, expires_delta=access_token_expires)
+            access_token = generate_access_token(user)
 
-            return jsonify({"access_token": access_token, "token_type": "bearer"})
+
+        return jsonify({"access_token": access_token, "token_type": "bearer"})
 
     @app.route("/logout", methods=["POST"])
     @swag_from({

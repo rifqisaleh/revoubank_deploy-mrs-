@@ -12,6 +12,7 @@ class User(db.Model):
     username = db.Column(db.String(255), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False)
+    role = db.Column(db.String, default="user")
     full_name = db.Column(db.String(255))
     phone_number = db.Column(db.String(50))
     failed_attempts = db.Column(db.Integer, default=0)

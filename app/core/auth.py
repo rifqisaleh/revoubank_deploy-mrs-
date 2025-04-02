@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta
 from typing import Optional
-from jose import JWTError, jwt
+from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request, create_access_token
 from flask import request, jsonify, abort
 from dotenv import load_dotenv
 
@@ -18,14 +18,14 @@ ALGORITHM = "HS256"
 MAX_FAILED_ATTEMPTS = int(os.getenv("MAX_FAILED_ATTEMPTS", 3))
 LOCK_DURATION = timedelta(minutes=int(os.getenv("LOCK_DURATION_MINUTES", 15)))
 
-
-# Create JWT Access Token
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
+# Generate access token for a user
+def generate_access_token(user):
+    return create_access_token(
+        identity=str(user.id),
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+        additional_claims={"role": user.role}  # ✅ add role here
+    )
+    
 
 # Authenticate User (via DB)
 def authenticate_user(username: str, password: str, db=None):
@@ -73,21 +73,10 @@ def authenticate_user(username: str, password: str, db=None):
 
 # Extract current user from JWT
 def get_current_user():
-    token = request.headers.get("Authorization")
-    if not token or not token.startswith("Bearer "):
-        abort(401, description="Missing or invalid token")
-
-    token = token.split(" ")[1]
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        if user_id is None:
-            abort(401, description="Invalid token payload")
-    except JWTError:
-        abort(401, description="Invalid token")
-
+    verify_jwt_in_request()
+    user_id = get_jwt_identity()
     with get_db() as db:
-        user = db.query(User).filter_by(id=int(user_id)).first()
+        user = db.query(User).filter_by(id=user_id).first()
         if not user:
             abort(401, description="User not found")
 
