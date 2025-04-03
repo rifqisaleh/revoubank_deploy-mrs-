@@ -23,7 +23,7 @@ def generate_access_token(user):
     return create_access_token(
         identity=str(user.id),
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-        additional_claims={"role": user.role}  # ✅ add role here
+        additional_claims={"role": user.role} 
     )
     
 

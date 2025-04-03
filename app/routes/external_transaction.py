@@ -8,6 +8,7 @@ from app.model.models import Account, Transaction
 from app.core.auth import get_current_user
 from app.services.email.utils import send_email_async
 from app.services.invoice.invoice_generator import generate_invoice
+from app.core.authorization import role_required
 
 external_transaction_bp = Blueprint('external_transaction', __name__)
 
@@ -17,6 +18,7 @@ def run_background_task(func, *args, **kwargs):
     thread.start()
 
 @external_transaction_bp.route("/external/deposit/", methods=["POST"])
+@role_required('user')
 @swag_from({
     "tags": ["external transactions"],
     "summary": "Deposit from external bank",
@@ -138,6 +140,7 @@ def external_deposit():
 
 
 @external_transaction_bp.route("/external/withdraw/", methods=["POST"])
+@role_required('user')
 @swag_from({
     "tags": ["external transactions"],
     "summary": "Withdraw to external bank",

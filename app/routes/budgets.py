@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flasgger.utils import swag_from
 from app.model.base import get_db
 from app.core.auth import get_current_user
+from app.core.authorization import role_required
 from app.model.models import Budget
 from decimal import Decimal
 
@@ -9,6 +10,7 @@ budgets_bp = Blueprint("budgets", __name__, url_prefix="/budgets")
 
 
 @budgets_bp.route("/", methods=["POST"])
+@role_required('user')
 @swag_from({
     "tags": ["budgets"],
     "summary": "Create a new budget",
@@ -72,6 +74,7 @@ def get_budgets():
 
 
 @budgets_bp.route("/<int:budget_id>", methods=["PUT"])
+@role_required('user')
 @swag_from({
     "tags": ["budgets"],
     "summary": "Update a budget",
@@ -114,6 +117,7 @@ def update_budget(budget_id):
 
 
 @budgets_bp.route("/<int:budget_id>", methods=["DELETE"])
+@role_required('user')
 @swag_from({
     "tags": ["budgets"],
     "summary": "Delete a budget",

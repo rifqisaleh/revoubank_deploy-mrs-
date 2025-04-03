@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flasgger.utils import swag_from
 from app.model.base import get_db
 from app.core.auth import get_current_user
+from app.core.authorization import role_required
 from app.model.models import Bill
 from decimal import Decimal
 from datetime import datetime
@@ -10,6 +11,7 @@ bills_bp = Blueprint("bills", __name__, url_prefix="/bills")
 
 
 @bills_bp.route("/", methods=["POST"])
+@role_required('user')
 @swag_from({
     "tags": ["bills"],
     "summary": "Create a new bill",
@@ -58,6 +60,7 @@ def create_bill():
 
 
 @bills_bp.route("/", methods=["GET"])
+@role_required('user')
 @swag_from({
     "tags": ["bills"],
     "summary": "Get all bills for current user",
@@ -80,6 +83,7 @@ def get_bills():
 
 
 @bills_bp.route("/<int:bill_id>", methods=["PUT"])
+@role_required('user')
 @swag_from({
     "tags": ["bills"],
     "summary": "Update a bill",
@@ -131,6 +135,7 @@ def update_bill(bill_id):
 
 
 @bills_bp.route("/<int:bill_id>", methods=["DELETE"])
+@role_required('user')
 @swag_from({
     "tags": ["bills"],
     "summary": "Delete a bill",

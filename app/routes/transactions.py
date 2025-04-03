@@ -9,6 +9,7 @@ from app.model.models import Account, Transaction, User
 from app.core.auth import get_current_user
 from app.services.email.utils import send_email_async
 from app.services.invoice.invoice_generator import generate_invoice
+from app.core.authorization import role_required
 
 transactions_bp = Blueprint('transactions', __name__)
 
@@ -29,6 +30,7 @@ def validate_content_type():
 
 
 @transactions_bp.route('/deposit/', methods=['POST'])
+@role_required('user')
 @swag_from({
     "tags": ["transactions"],
     "summary": "Deposit Money",
@@ -169,6 +171,7 @@ def deposit():
 
 
 @transactions_bp.route('/withdraw/', methods=['POST'])
+@role_required('user')
 @swag_from({
     "tags": ["transactions"],
     "summary": "Withdraw Money",
@@ -303,6 +306,7 @@ def withdraw():
     
     
 @transactions_bp.route('/transfer/', methods=['POST'])
+@role_required('user')
 @swag_from({
     "tags": ["transactions"],
     "summary": "Transfer Money",
@@ -553,6 +557,7 @@ def get_transaction_for_user(user_id):
 
 
 @transactions_bp.route('/check-balance/', methods=['GET'])
+@role_required('user')
 @swag_from({
     'tags': ['transactions'],
     'summary': 'Check Account Balance',

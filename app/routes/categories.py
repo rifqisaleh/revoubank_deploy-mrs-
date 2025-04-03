@@ -2,12 +2,14 @@ from flask import Blueprint, request, jsonify
 from flasgger.utils import swag_from
 from app.model.base import get_db
 from app.core.auth import get_current_user
+from app.core.authorization import role_required
 from app.model.models import TransactionCategory
 
 categories_bp = Blueprint("categories", __name__, url_prefix="/categories")
 
 
 @categories_bp.route("/", methods=["POST"])
+@role_required('user')
 @swag_from({
     "tags": ["transaction categories"],
     "summary": "Create a transaction category",
@@ -42,6 +44,7 @@ def create_category():
 
 
 @categories_bp.route("/", methods=["GET"])
+@role_required('user')
 @swag_from({
     "tags": ["transaction categories"],
     "summary": "Get all categories",
@@ -61,6 +64,7 @@ def get_categories():
 
 
 @categories_bp.route("/<int:category_id>", methods=["PUT"])
+@role_required('user')
 @swag_from({
     "tags": ["transaction categories"],
     "summary": "Update a transaction category",
@@ -98,6 +102,7 @@ def update_category(category_id):
 
 
 @categories_bp.route("/<int:category_id>", methods=["DELETE"])
+@role_required('user')
 @swag_from({
     "tags": ["transaction categories"],
     "summary": "Delete a transaction category",

@@ -4,6 +4,7 @@ from decimal import Decimal
 from datetime import datetime
 from app.model.base import get_db
 from app.core.auth import get_current_user
+from app.core.authorization import role_required
 from app.utils.verification import verify_card_number
 from app.services.email.utils import send_email_async
 from app.services.invoice.invoice_generator import generate_invoice
@@ -12,6 +13,7 @@ from app.model.models import Account, Transaction, Bill
 billpayment_bp = Blueprint('billpayment', __name__, url_prefix="/bills")
 
 @billpayment_bp.route("/pay/card", methods=["POST"])
+@role_required('user')
 @swag_from({
     "tags": ["bill payment"],
     "summary": "Pay a bill using a credit card",
@@ -129,6 +131,7 @@ def pay_bill_with_card():
 
 
 @billpayment_bp.route("/<int:bill_id>/pay", methods=["POST"])
+@role_required('user')
 @swag_from({
     "tags": ["bill payment"],
     "summary": "Pay a bill using account balance",

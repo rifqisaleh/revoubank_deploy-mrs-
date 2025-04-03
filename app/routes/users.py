@@ -7,6 +7,8 @@ from app.model.models import User
 from app import db
 from app.utils.user import hash_password
 from app.core.auth import get_current_user
+from app.core.authorization import role_required
+
 
 
 users_bp = Blueprint('users', __name__)
@@ -106,6 +108,7 @@ def register_user():
 
 
 @users_bp.route("/", methods=["GET"])
+@role_required("admin")
 @swag_from({
     "tags": ["users"],
     'summary': 'List all users',
@@ -237,6 +240,7 @@ def update_profile():
 
 
 @users_bp.route("/<int:user_id>", methods=["DELETE"])
+@role_required("admin")
 @swag_from({
     "tags": ["users"],
     'summary': 'Delete a user',
@@ -255,9 +259,6 @@ def delete_user(user_id):
     
     if not auth_user:
         abort(401, description="Unauthorized")
-
-    if auth_user["id"] != user_id:
-        abort(403, description="Forbidden: You can only delete your own account")
 
     user = User.query.get(user_id)
     if not user:

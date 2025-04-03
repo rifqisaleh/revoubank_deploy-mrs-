@@ -3,6 +3,7 @@ from flasgger.utils import swag_from
 from app.model.models import Account
 from app.model.models import db
 from app.core.auth import get_current_user
+from app.core.authorization import role_required
 from app.schemas import AccountCreate, AccountResponse
 from decimal import Decimal
 from datetime import datetime
@@ -14,6 +15,7 @@ accounts_bp = Blueprint('accounts', __name__)
 
 
 @accounts_bp.route("/", methods=["POST"])
+@role_required("user")
 @swag_from({
     "tags": ["accounts"],
     "summary": "Create a new bank account",
@@ -96,6 +98,7 @@ def create_account():
 
 
 @accounts_bp.route("/", methods=["GET"])
+@role_required("admin")
 @swag_from({
     'tags': ['accounts'],
     'summary': 'List user accounts',
