@@ -57,4 +57,4 @@ if __name__ == "__main__":
     debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
     print("\n✅ Flask app is running on http://127.0.0.1:5000")
     print("📜 Swagger Docs: http://127.0.0.1:5000/apidocs\n")
-    app.run(host="0.0.0.0", port=port, debug=debug_mode)
+    app.run(host="0.0.0.0", port=port, debug=debug_mode, threaded=False)

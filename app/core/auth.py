@@ -2,12 +2,13 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request, create_access_token
+from app.core.extensions import limiter
 from flask import request, jsonify, abort
 from dotenv import load_dotenv
-
 from app.database.dependency import get_db
 from app.model.models import User
 from app.utils.user import verify_password
+
 
 # Load environment variables from .env file
 load_dotenv()
