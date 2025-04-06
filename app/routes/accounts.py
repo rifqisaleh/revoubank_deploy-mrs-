@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, make_response
+from app.core.logger import logger
 from flasgger.utils import swag_from
 from app.model.models import Account
 from app.model.models import db
@@ -113,6 +114,7 @@ def list_accounts():
     """Retrieves all accounts associated with the authenticated user."""
     current_user = get_current_user()
     if not current_user:
+        logger.warning("🔒 Unauthorized access attempt to list accounts")
         return make_response(jsonify({"detail": "Unauthorized"}), 401)
     
     try:
@@ -120,7 +122,9 @@ def list_accounts():
             user_id=current_user["id"],
             is_deleted=False
         ).all()
-        
+
+        logger.info(f"📄 {len(accounts)} account(s) fetched for user {current_user['username']}")
+
         return jsonify([
             AccountResponse(
                 id=acc.id,
@@ -131,8 +135,10 @@ def list_accounts():
             ).dict()
             for acc in accounts
         ])
+    
     except Exception as e:
-        return make_response(jsonify({"detail": str(e)}), 500)
+        logger.error(f"❌ Error retrieving accounts for user {current_user['username']}", exc_info=True)
+        return make_response(jsonify({"detail": "Internal Server Error"}), 500)
 
 @accounts_bp.route("/<int:id>", methods=["GET"])
 @swag_from({

@@ -1,4 +1,5 @@
 import os
+from app.core.logger import logger
 from datetime import datetime, timedelta
 from typing import Optional
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request, create_access_token
@@ -74,11 +75,17 @@ def authenticate_user(username: str, password: str, db=None):
 
 # Extract current user from JWT
 def get_current_user():
-    verify_jwt_in_request()
-    user_id = get_jwt_identity()
+    try:
+        verify_jwt_in_request()
+        user_id = get_jwt_identity()
+    except Exception:
+        logger.warning(f"🔒 Missing or invalid JWT for: {request.method} {request.path}")
+        abort(401, description="Missing or invalid token")
+
     with get_db() as db:
         user = db.query(User).filter_by(id=user_id).first()
         if not user:
+            logger.warning(f"🔒 Token provided but user not found (id={user_id})")
             abort(401, description="User not found")
 
         return {

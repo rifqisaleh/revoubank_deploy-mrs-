@@ -1,5 +1,7 @@
 import os
+from app.core.logger import logger
 from flask import Flask, request, jsonify
+import logging
 from datetime import timedelta, datetime
 from flask_jwt_extended import create_access_token, JWTManager
 from config import Config
@@ -44,6 +46,8 @@ def create_app(test_config=None):
     jwt.init_app(app)
     db.init_app(app)
     migrate.init_app(app, db)
+    log_level = getattr(logging, app.config.get("LOG_LEVEL", "INFO"))
+    logger.setLevel(log_level)
     CORS(app)   
     
     # ✅ Register blueprints

@@ -17,8 +17,7 @@ class Config:
     MAIL_USERNAME = os.getenv("MAIL_USERNAME")
     MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER")
-
-# Security & Database Configuration
+    # Security & Database Configuration
     SECRET_KEY = os.getenv("SECRET_KEY", "f2d49c89bb3df7c107c9dd473bc36a8177fbf528bce83d012f4db34d1b6d0dbe")
     DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://revou:revou123@localhost:5433/revoubank")
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
@@ -26,5 +25,11 @@ class Config:
     MAX_FAILED_ATTEMPTS = 4
     LOCK_DURATION = timedelta(minutes=15)
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
+    LOG_LEVEL = "INFO"
+
+class ProductionConfig(Config):
+    LOG_LEVEL = "WARNING"    
+
+    
 
 

@@ -1,8 +1,9 @@
 import logging
+from flask import current_app
 
 logger = logging.getLogger("revoubank")
-logger.setLevel(logging.INFO)  # ✅ Use the constant, not the function
 
+# We'll set this level dynamically later inside create_app()
 formatter = logging.Formatter(
     "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 )
