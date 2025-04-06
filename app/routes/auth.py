@@ -1,4 +1,5 @@
 # app/routes/auth.py
+from app.core.logger import logger
 from flask import Blueprint, request, jsonify
 from flasgger import swag_from
 from app.core.extensions import limiter
@@ -9,7 +10,6 @@ from app.services.email.utils import send_email_async
 from app.core.auth import generate_access_token
 from config import Config
 from datetime import datetime
-
 
 
 auth_bp = Blueprint("auth", __name__)
@@ -41,69 +41,79 @@ auth_bp = Blueprint("auth", __name__)
     }
 })
 def login():
-    """
-    Login. Authenticate user and generate JWT token
-    """
     form_data = request.form
     username = form_data.get("username")
     password = form_data.get("password")
 
-    with get_db() as db:
-        user = db.query(User).filter_by(username=username).first()
+    logger.info(f"🔐 Login attempt for user: {username}")
 
-        if not user:
-            return jsonify({
-                "detail": "Incorrect username or password.",
-                "attempts_left": Config.MAX_FAILED_ATTEMPTS
-            }), 400
+    try:
+        with get_db() as db:
+            user = db.query(User).filter_by(username=username).first()
 
-        if user.is_locked:
-            if user.locked_time and datetime.utcnow() > user.locked_time + Config.LOCK_DURATION:
-                user.is_locked = False
-                user.failed_attempts = 0
-                db.commit()
-            else:
+            if not user:
+                logger.warning(f"❌ Login failed: username '{username}' not found")
                 return jsonify({
-                    "detail": "Account is locked due to multiple failed login attempts. Please try again later."
-                }), 403
+                    "detail": "Incorrect username or password.",
+                    "attempts_left": Config.MAX_FAILED_ATTEMPTS
+                }), 400
 
-        if not verify_password(password, user.password):
-            user.failed_attempts += 1
+            if user.is_locked:
+                if user.locked_time and datetime.utcnow() > user.locked_time + Config.LOCK_DURATION:
+                    user.is_locked = False
+                    user.failed_attempts = 0
+                    db.commit()
+                    logger.info(f"🔓 Account unlocked: {username}")
+                else:
+                    logger.warning(f"🔒 Login blocked: account '{username}' is locked")
+                    return jsonify({
+                        "detail": "Account is locked due to multiple failed login attempts. Please try again later."
+                    }), 403
 
-            if user.failed_attempts >= Config.MAX_FAILED_ATTEMPTS:
-                user.is_locked = True
-                user.locked_time = datetime.utcnow()
+            if not verify_password(password, user.password):
+                user.failed_attempts += 1
 
-                send_email_async(
-                    subject="Your RevouBank Account is Locked",
-                    recipient=user.email,
-                    body=f"""
-                    Dear {username},
+                if user.failed_attempts >= Config.MAX_FAILED_ATTEMPTS:
+                    user.is_locked = True
+                    user.locked_time = datetime.utcnow()
 
-                    Your RevouBank account has been locked due to multiple failed login attempts.
-                    Please wait 15 minutes before trying again.
+                    send_email_async(
+                        subject="Your RevouBank Account is Locked",
+                        recipient=user.email,
+                        body=f"""
+                        Dear {username},
 
-                    - RevouBank Support
-                    """
-                )
+                        Your RevouBank account has been locked due to multiple failed login attempts.
+                        Please wait 15 minutes before trying again.
 
+                        - RevouBank Support
+                        """
+                    )
+                    logger.warning(f"🔒 Account locked due to too many failed attempts: {username}")
+
+                db.commit()
+
+                attempts_left = max(0, Config.MAX_FAILED_ATTEMPTS - user.failed_attempts)
+                logger.warning(f"❌ Incorrect password for user '{username}' — {attempts_left} attempts left")
+                return jsonify({
+                    "detail": "Incorrect username or password.",
+                    "attempts_left": attempts_left
+                }), 400
+
+            # Successful login
+            user.failed_attempts = 0
+            user.is_locked = False
+            user.locked_time = None
             db.commit()
 
-            attempts_left = max(0, Config.MAX_FAILED_ATTEMPTS - user.failed_attempts)
-            return jsonify({
-                "detail": "Incorrect username or password.",
-                "attempts_left": attempts_left
-            }), 400
+            access_token = generate_access_token(user)
+            logger.info(f"✅ Login successful for user: {username}")
+            return jsonify({"access_token": access_token, "token_type": "bearer"})
 
-        # Successful login
-        user.failed_attempts = 0
-        user.is_locked = False
-        user.locked_time = None
-        db.commit()
+    except Exception as e:
+        logger.error(f"🔥 Unexpected error during login for {username}", exc_info=e)
+        return jsonify({"detail": "Internal server error"}), 500
 
-        access_token = generate_access_token(user)
-
-    return jsonify({"access_token": access_token, "token_type": "bearer"})
 
 
 @auth_bp.route("/logout", methods=["POST"])
