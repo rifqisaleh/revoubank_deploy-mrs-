@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from app.core.logger import logger
 from threading import Thread
 from flasgger.utils import swag_from
 from decimal import Decimal
@@ -64,6 +65,7 @@ def external_deposit():
     db = next(get_db())
 
     if not request.is_json:
+        logger.warning("❗ Unsupported media type for external deposit request")
         return jsonify({"detail": "Unsupported Media Type"}), 415
 
     try:
@@ -72,17 +74,19 @@ def external_deposit():
 
         missing = required_fields - set(data.keys())
         if missing:
+            logger.warning(f"🚫 Missing fields in external deposit: {', '.join(missing)}")
             return jsonify({"detail": f"Missing fields: {', '.join(missing)}"}), 400
-
 
         amount = Decimal(data["amount"])
         if amount <= 0:
+            logger.warning(f"🚫 Invalid amount in external deposit: {amount}")
             return jsonify({"detail": "Amount must be greater than zero"}), 400
 
         current_user = get_current_user()
-        account = db.query(Account).filter_by(user_id=current_user["id"]).first()
 
+        account = db.query(Account).filter_by(user_id=current_user["id"]).first()
         if not account:
+            logger.warning(f"🧾 Account not found for user {current_user['username']}")
             return jsonify({"detail": "User account not found"}), 404
 
         # Update balance
@@ -100,6 +104,10 @@ def external_deposit():
         db.add(transaction)
         db.commit()
         db.refresh(transaction)
+
+        logger.info(
+            f"💸 External deposit of ${amount} from {data['bank_name']} by user {current_user['username']} (txn_id={transaction.id})"
+        )
 
         # Generate invoice
         invoice_filename = f"invoice_{transaction.id}.pdf"
@@ -135,7 +143,9 @@ def external_deposit():
 
     except Exception as e:
         db.rollback()
+        logger.error("❌ Error during external deposit", exc_info=True)
         return jsonify({"detail": f"Error: {str(e)}"}), 400
+
 
 
 
@@ -186,25 +196,32 @@ def external_withdraw():
     db = next(get_db())
 
     if not request.is_json:
+        logger.warning("❗ Unsupported media type for external withdrawal request")
         return jsonify({"detail": "Unsupported Media Type"}), 415
 
     try:
         data = request.get_json()
         required_fields = {"bank_name", "account_number", "amount"}
 
-        if not all(field in data for field in required_fields):
-            return jsonify({"detail": f"Missing fields: {required_fields - data.keys()}"}), 400
+        missing = required_fields - set(data.keys())
+        if missing:
+            logger.warning(f"🚫 Missing fields in external withdrawal: {', '.join(missing)}")
+            return jsonify({"detail": f"Missing fields: {', '.join(missing)}"}), 400
 
         amount = Decimal(data["amount"])
         if amount <= 0:
+            logger.warning(f"🚫 Invalid amount in external withdrawal: {amount}")
             return jsonify({"detail": "Amount must be greater than zero"}), 400
 
         current_user = get_current_user()
         account = db.query(Account).filter_by(user_id=current_user["id"]).first()
 
         if not account:
+            logger.warning(f"🧾 Account not found for user {current_user['username']}")
             return jsonify({"detail": "User account not found"}), 404
+
         if account.balance < amount:
+            logger.warning(f"💸 Insufficient funds for user {current_user['username']} - attempted to withdraw ${amount}, balance is ${account.balance}")
             return jsonify({"detail": "Insufficient balance"}), 400
 
         # Update balance
@@ -222,6 +239,10 @@ def external_withdraw():
         db.add(transaction)
         db.commit()
         db.refresh(transaction)
+
+        logger.info(
+            f"💸 External withdrawal of ${amount} to {data['bank_name']} by user {current_user['username']} (txn_id={transaction.id})"
+        )
 
         # Generate invoice
         invoice_filename = f"invoice_{transaction.id}.pdf"
@@ -257,4 +278,5 @@ def external_withdraw():
 
     except Exception as e:
         db.rollback()
+        logger.error("❌ Error during external withdrawal", exc_info=True)
         return jsonify({"detail": f"Error: {str(e)}"}), 400

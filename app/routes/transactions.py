@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from app.core.logger import logger
 from flasgger.utils import swag_from
 from werkzeug.exceptions import BadRequest, NotFound
 from decimal import Decimal
@@ -16,8 +17,7 @@ transactions_bp = Blueprint('transactions', __name__)
 @transactions_bp.before_request
 def validate_content_type():
     """Ensure Content-Type is application/json for POST requests."""
-    print("🔍 Request Headers:", request.headers)  # Debugging
-    print("🔍 Content-Type:", request.content_type)  # Debugging
+   
 
     if request.method in ['POST', 'PUT', 'PATCH']:
         if not request.content_type or 'application/json' not in request.content_type:
@@ -77,8 +77,7 @@ def deposit():
 
     try:
         data = request.get_json()
-        print("🔍 Parsed JSON Data:", data)
-
+            
         if not isinstance(data, dict):
             return jsonify({"detail": "Invalid request format"}), 400
 
@@ -93,11 +92,15 @@ def deposit():
             receiver_id = int(receiver_id)
         except (ValueError, TypeError, Decimal.InvalidOperation):
             return jsonify({"detail": "Invalid amount or receiver_id format"}), 400
+        
+        current_user = get_current_user()
 
         if amount <= 0:
+            logger.warning(f"⚠️ Invalid deposit amount by user {current_user['username']}")
             return jsonify({"detail": "Deposit amount must be greater than zero"}), 400
-
-        current_user = get_current_user()
+        
+        logger.info(f"📥 Deposit attempt by user {current_user['username']} to account {receiver_id}")
+        
         if not current_user:
             return jsonify({"detail": "Unauthorized"}), 401
 
@@ -158,6 +161,8 @@ def deposit():
         else:
             print("⚠️ No email found for user, skipping email notification.")
 
+        logger.info(f"✅ Deposit of ${amount} successful to account {receiver_id} by user {current_user['username']} - Transaction ID: {transaction.id}")    
+
         return jsonify({
             "message": "Deposit successful",
             "transaction_id": transaction.id,
@@ -166,8 +171,8 @@ def deposit():
 
     except (TypeError, ValueError) as e:
         db.rollback()
-        print(f"❌ Error in deposit: {e}")  # Debugging
         return jsonify({"detail": "Invalid JSON format or data types"}), 400
+
 
 
 @transactions_bp.route('/withdraw/', methods=['POST'])
@@ -218,8 +223,7 @@ def withdraw():
 
     try:
         data = request.get_json()
-        print("🔍 Parsed JSON Data:", data)
-
+       
         if not data or "amount" not in data or "sender_id" not in data:
             return jsonify({"detail": "Missing required fields: amount and sender_id"}), 400
 
@@ -229,10 +233,14 @@ def withdraw():
         except (ValueError, TypeError, Decimal.InvalidOperation):
             return jsonify({"detail": "Invalid amount or sender_id format"}), 400
 
+        current_user = get_current_user()
+
         if amount <= 0:
+            logger.warning(f"⚠️ Invalid withdrawal amount by user {get_current_user()['username']}")
             return jsonify({"detail": "Withdrawal amount must be greater than zero"}), 400
 
-        current_user = get_current_user()
+        logger.info(f"💵 Withdrawal attempt by user {current_user['username']} from account {sender_id}")
+        
         if not current_user:
             return jsonify({"detail": "Unauthorized"}), 401
 
@@ -292,6 +300,8 @@ def withdraw():
         else:
             print("⚠️ No email found for user, skipping email notification.")
 
+        logger.info(f"✅ Withdrawal of ${amount} successful from account {sender_id} by user {current_user['username']} - Transaction ID: {transaction.id}")    
+
         return jsonify({
             "message": "Withdrawal successful",
             "transaction_id": transaction.id,
@@ -301,7 +311,10 @@ def withdraw():
     except (TypeError, ValueError) as e:
         db.rollback()
         print(f"❌ Error in withdrawal: {e}")
+        logger.error("❌ Error during withdrawal", exc_info=True)
         return jsonify({"detail": "Invalid JSON format or data types"}), 400
+        
+
 
     
     
@@ -358,8 +371,7 @@ def transfer():
 
     try:
         data = request.get_json()
-        print("🔍 Parsed JSON Data:", data)
-
+        
         if not data or "sender_id" not in data or "receiver_id" not in data or "amount" not in data:
             return jsonify({"detail": "Missing required fields: sender_id, receiver_id, amount"}), 400
 
@@ -370,10 +382,14 @@ def transfer():
         except (ValueError, TypeError, Decimal.InvalidOperation):
             return jsonify({"detail": "Invalid amount, sender_id, or receiver_id format"}), 400
 
+        current_user = get_current_user()
+
         if amount <= 0:
+            logger.warning(f"⚠️ Invalid transfer amount by user {current_user['username']}")
             return jsonify({"detail": "Transfer amount must be greater than zero"}), 400
 
-        current_user = get_current_user()
+        logger.info(f"💸 Transfer attempt by user {current_user['username']} from account {sender_id} to account {receiver_id}")
+
         if not current_user:
             return jsonify({"detail": "Unauthorized"}), 401
 
@@ -465,6 +481,10 @@ def transfer():
                 """,
                 attachment_path=invoice_path  # Attach invoice
             )
+        else:
+            print("⚠️ No email found for user, skipping email notification.")
+
+        logger.info(f"✅ Transfer of ${amount} successful from account {sender_id} to account {receiver_id} by user {current_user['username']} - Transaction ID: {transaction.id}")
 
         return jsonify({
             "message": "Transfer successful",
@@ -475,8 +495,9 @@ def transfer():
 
     except (TypeError, ValueError) as e:
         db.rollback()
-        print(f"❌ Error in transfer: {e}")
+        logger.error("❌ Error during transfer", exc_info=True)
         return jsonify({"detail": "Invalid JSON format or data types"}), 400
+
 
 @transactions_bp.route('/', methods=['GET'])
 @swag_from({
@@ -491,17 +512,18 @@ def transfer():
 
 def list_transactions():
     current_user = get_current_user()
-    print("🔑 Current User:", current_user)
-
+    
     if not current_user:
         return jsonify({"detail": "Unauthorized"}), 401
+    
+    logger.info(f"🔍 Fetching transactions for user {current_user['username']}")
 
     db = next(get_db())
 
     # Get the user's accounts
     accounts = db.query(Account).filter_by(user_id=current_user["id"]).all()
     account_ids = [acc.id for acc in accounts]
-    print("🔍 Account IDs for User", current_user["id"], ":", account_ids)
+    
 
     if not account_ids:
         return jsonify([])
@@ -512,7 +534,7 @@ def list_transactions():
         (Transaction.receiver_id.in_(account_ids))
     ).order_by(Transaction.timestamp.desc()).all()  # Sort by timestamp for clarity
 
-    print("🔍 Found Transactions:", [t.id for t in transactions])
+    
 
     # Ensure transactions are serialized properly
     return jsonify([t.as_dict() for t in transactions])
@@ -535,22 +557,26 @@ def list_transactions():
 def get_transaction_for_user(user_id):
     """Fetches a specific transaction by user ID."""
     current_user = get_current_user()
+
     if not current_user or current_user["id"] != user_id:
+        logger.warning(f"⛔ User {current_user['username']} attempted to access transactions belonging to another user")
         return jsonify({"detail": "Unauthorized"}), 401
+    
+    logger.info(f"🔍 Transactions retrieved for user {current_user['username']}")
 
     db = next(get_db())
 
     # 🔍 DEBUG: Show all account IDs for the user
     accounts = db.query(Account).filter_by(user_id=user_id).all()
     account_ids = [acc.id for acc in accounts]
-    print("🔍 Account IDs for User", user_id, ":", account_ids)
+    
 
     # 🔍 DEBUG: Show matching transactions
     transactions = db.query(Transaction).filter(
         (Transaction.sender_id.in_(account_ids)) |
         (Transaction.receiver_id.in_(account_ids))
     ).all()
-    print("🔍 Transactions found:", transactions)
+    
 
     return jsonify([t.as_dict() for t in transactions])
 
@@ -575,7 +601,10 @@ def check_balance():
     """Fetches the current balance of an account owned by the user."""
     current_user = get_current_user()
     if not current_user:
+        logger.warning(f"⚠️ Transaction {id} not found for user {current_user['username']}")
         return jsonify({"detail": "Unauthorized"}), 401
+    
+    logger.info(f"🔍 Checking balance for user {current_user['username']}")
 
     account_id = request.args.get('account_id', type=int)
     db = next(get_db())
@@ -604,10 +633,12 @@ def check_balance():
 def check_transaction_balance(id):
     """Fetch the balance of a specific transaction."""
     current_user = get_current_user()
-    if not current_user:
-        return jsonify({"detail": "Unauthorized"}), 401
 
-    print("🔍 Checking balance for transaction ID:", id)  # Debugging
+    if not current_user:
+        logger.warning(f"⚠️ Transaction {id} not found for user {current_user['username']}")
+        return jsonify({"detail": "Unauthorized"}), 401
+    
+    logger.info(f"🔍 Checking balance for transaction {id} for user {current_user['username']}")
 
     db = next(get_db())
     transaction = db.query(Transaction).filter_by(id=id).first()
