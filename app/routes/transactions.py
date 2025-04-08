@@ -283,6 +283,22 @@ def transfer():
     'tags': ['transactions'],
     'summary': 'List Transactions',
     'description': 'Fetches all transactions associated with the authenticated user.',
+    'parameters': [
+    {
+        'name': 'page',
+        'in': 'query',
+        'type': 'integer',
+        'description': 'Page number for pagination',
+        'required': False
+    },
+    {
+        'name': 'per_page',
+        'in': 'query',
+        'type': 'integer',
+        'description': 'Number of transactions per page',
+        'required': False
+    }
+],
     'responses': {
         200: {'description': 'Transaction list retrieved'}
     },

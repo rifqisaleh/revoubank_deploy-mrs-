@@ -44,6 +44,15 @@ class Account(db.Model):
     "User",
     back_populates="accounts"
 )
+    def as_dict(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "account_type": self.account_type,
+            "balance": float(self.balance),
+            "account_number": self.account_number
+        }
+
 
 
     # Ensure account_number is populated before insert

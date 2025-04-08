@@ -10,6 +10,7 @@ from app.schemas import AccountCreate, AccountResponse
 from decimal import Decimal
 from datetime import datetime
 from app.services.accounts.core import create_account_logic, list_user_accounts_logic, get_user_account_by_id_logic, update_user_account_logic, delete_user_account_logic
+from app.utils.pagination import apply_pagination
 from uuid import uuid4
 
 accounts_bp = Blueprint('accounts', __name__)
@@ -89,6 +90,10 @@ def create_account():
     'tags': ['accounts'],
     'summary': 'List user accounts',
     'description': 'Retrieves all bank accounts associated with the authenticated user.',
+    'parameters': [
+        {"name": "page", "in": "query", "type": "integer", "required": False, "default": 1},
+        {"name": "per_page", "in": "query", "type": "integer", "required": False, "default": 10}
+    ],
     'responses': {
         200: {'description': 'List of accounts retrieved successfully'},
         401: {'description': 'Unauthorized'}
@@ -97,9 +102,18 @@ def create_account():
 def list_user_accounts():
     db = next(get_db())
     current_user = get_current_user()
+
     try:
-        accounts_data = list_user_accounts_logic(db, current_user)
-        return jsonify(accounts_data)
+        query = db.query(Account).filter_by(is_deleted=False)
+        total, paginated_accounts = apply_pagination(query)
+
+        return jsonify({
+            "total": total,
+            "page": request.args.get("page", 1, type=int),
+            "per_page": request.args.get("per_page", 10, type=int),
+            "accounts": [acc.as_dict() for acc in paginated_accounts]
+        })
+
     except Exception as e:
         logger.error(f"❌ Failed to retrieve accounts: {str(e)}")
         return jsonify({"detail": "Failed to retrieve accounts"}), 500

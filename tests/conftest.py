@@ -26,6 +26,7 @@ def app():
         "TESTING": True,
         "SQLALCHEMY_DATABASE_URI": TEST_DATABASE_URL,
         "SQLALCHEMY_TRACK_MODIFICATIONS": False,
+        "JWT_SECRET_KEY": "test-secret",
     })
 
     with app.app_context():
@@ -62,12 +63,13 @@ def client(app, test_db, monkeypatch):
     """
     Flask test client with test DB injected.
     """
-    from app.routes import transactions
+    from app.routes import transactions, accounts
 
     def get_test_db():
         yield test_db
 
     monkeypatch.setattr(transactions, "get_db", get_test_db)
+    monkeypatch.setattr(accounts, "get_db", get_test_db)
 
     with app.test_client() as client:
         yield client
