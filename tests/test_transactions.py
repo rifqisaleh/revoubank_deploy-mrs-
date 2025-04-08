@@ -136,3 +136,102 @@ def test_create_transaction_insufficient_balance(mock_get_db, mock_user, client)
     })
 
     assert response.status_code in (400, 404)
+
+@patch("app.routes.transactions.get_db")
+@patch("app.routes.transactions.get_current_user", return_value={"id": 1, "username": "test_user"})
+def test_list_transactions_with_pagination(mock_user, mock_get_db, client):
+    mock_session = MagicMock()
+
+    # Mock Account model query
+    mock_account = MagicMock()
+    mock_account.id = 123
+
+    # Mock Transaction model query
+    mock_transaction = MagicMock()
+    mock_transaction.as_dict.return_value = {
+        "id": 1,
+        "type": "deposit",
+        "amount": 100,
+        "timestamp": "2024-04-08T12:00:00Z"
+    }
+
+    # Mock .query(Account)
+    def query_side_effect(model):
+        if model.__name__ == "Account":
+            account_query = MagicMock()
+            account_query.filter_by.return_value.all.return_value = [mock_account]
+            return account_query
+        elif model.__name__ == "Transaction":
+            txn_query = MagicMock()
+            txn_query.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [mock_transaction]
+            txn_query.filter.return_value.order_by.return_value.count.return_value = 1
+            return txn_query
+        return MagicMock()
+
+    mock_session.query.side_effect = query_side_effect
+    mock_get_db.return_value.__next__.return_value = mock_session
+
+    response = client.get("/transactions/?page=1&per_page=1")
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["total"] == 1
+    assert len(data["transactions"]) == 1
+    assert data["transactions"][0]["type"] == "deposit"
+
+@patch("app.routes.transactions.get_db")
+@patch("app.routes.transactions.get_current_user", return_value={"id": 1, "username": "test_user"})
+def test_list_transactions_page_two(mock_user, mock_get_db, client):
+    mock_session = MagicMock()
+    mock_account = MagicMock()
+    mock_account.id = 123
+
+    mock_account_query = MagicMock()
+    mock_account_query.filter_by.return_value.all.return_value = [mock_account]
+
+    mock_transaction_query = MagicMock()
+    mock_transaction_query.filter.return_value.order_by.return_value.count.return_value = 1
+    mock_transaction_query.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = []
+
+    def query_side_effect(model):
+        if model.__name__ == "Account":
+            return mock_account_query
+        elif model.__name__ == "Transaction":
+            return mock_transaction_query
+        return MagicMock()
+
+    mock_session.query.side_effect = query_side_effect
+    mock_get_db.return_value.__next__.return_value = mock_session
+
+    response = client.get("/transactions/?page=2&per_page=1")
+    assert response.status_code == 200
+    assert response.json["transactions"] == []
+
+
+@patch("app.routes.transactions.get_current_user", return_value={"id": 1, "username": "test_user"})
+@patch("app.routes.transactions.get_db")
+def test_list_transactions_invalid_pagination(mock_get_db, mock_user, client):
+    mock_session = MagicMock()
+    mock_account = MagicMock()
+    mock_account.id = 123
+
+    mock_account_query = MagicMock()
+    mock_account_query.filter_by.return_value.all.return_value = [mock_account]
+
+    mock_transaction_query = MagicMock()
+    mock_transaction_query.filter.return_value.order_by.return_value.count.return_value = 0
+    mock_transaction_query.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = []
+
+    def query_side_effect(model):
+        if model.__name__ == "Account":
+            return mock_account_query
+        elif model.__name__ == "Transaction":
+            return mock_transaction_query
+        return MagicMock()
+
+    mock_session.query.side_effect = query_side_effect
+    mock_get_db.return_value.__next__.return_value = mock_session
+
+    response = client.get("/transactions/?page=abc&per_page=-5")
+    assert response.status_code == 200
+    assert "transactions" in response.json

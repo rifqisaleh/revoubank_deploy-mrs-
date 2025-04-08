@@ -301,21 +301,32 @@ def list_transactions():
     # Get the user's accounts
     accounts = db.query(Account).filter_by(user_id=current_user["id"]).all()
     account_ids = [acc.id for acc in accounts]
-    
 
     if not account_ids:
         return jsonify([])
 
-    # Fix: Ensure the query properly fetches transactions for both sender and receiver
-    transactions = db.query(Transaction).filter(
+    # Get pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+
+    # Create a query object first
+    transactions_query = db.query(Transaction).filter(
         (Transaction.sender_id.in_(account_ids)) | 
         (Transaction.receiver_id.in_(account_ids))
-    ).order_by(Transaction.timestamp.desc()).all()  # Sort by timestamp for clarity
+    ).order_by(Transaction.timestamp.desc())
 
-    
+    total = transactions_query.count()
 
-    # Ensure transactions are serialized properly
-    return jsonify([t.as_dict() for t in transactions])
+    # Apply pagination
+    transactions = transactions_query.offset((page - 1) * per_page).limit(per_page).all()
+
+    return jsonify({
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "transactions": [t.as_dict() for t in transactions]
+    })
+
 
 @transactions_bp.route('/<int:user_id>', methods=['GET'])
 @swag_from({

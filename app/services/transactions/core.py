@@ -197,16 +197,21 @@ def handle_pay_bill_with_card(db, current_user, bill_id, card_number):
     if not bill:
         raise LookupError("Bill not found")
     if bill.is_paid:
+        logger.warning(f"⚠️ Attempt to pay already paid bill {bill_id} by user {current_user['username']}")
         raise ValueError("Bill is already paid")
 
     amount = bill.amount
     if amount <= 0:
+        logger.error(f"❌ Invalid bill amount ${amount} for bill {bill_id}")
         raise ValueError("Bill amount must be greater than zero")
 
     # Fetch account
     account = db.query(Account).filter_by(user_id=current_user["id"]).first()
     if not account or account.balance < amount:
+        logger.warning(f"⚠️ Insufficient balance for bill payment by user {current_user['username']}")
         raise ValueError("Insufficient balance or account not found")
+
+    logger.info(f"💳 Processing bill payment of ${amount} for bill {bill_id} by user {current_user['username']}")
 
     # Deduct balance and mark bill as paid
     account.balance -= Decimal(str(amount))
@@ -224,6 +229,8 @@ def handle_pay_bill_with_card(db, current_user, bill_id, card_number):
     db.add(transaction)
     db.commit()
     db.refresh(transaction)
+    
+    logger.info(f"✅ Bill payment successful: ${amount} paid to {bill.biller_name} (txn_id={transaction.id})")
 
     send_invoice_with_email(transaction, user=current_user, account=account)
     return transaction, account
@@ -235,11 +242,15 @@ def handle_pay_bill_from_balance(db, current_user, bill_id):
     if not bill:
         raise LookupError("Bill not found")
     if bill.is_paid:
+        logger.warning(f"⚠️ Attempt to pay already paid bill {bill_id} by user {current_user['username']}")
         raise ValueError("Bill already paid")
 
     account = db.query(Account).filter_by(user_id=current_user["id"]).first()
     if not account or account.balance < bill.amount:
+        logger.warning(f"⚠️ Insufficient balance for bill payment by user {current_user['username']}")
         raise ValueError("Insufficient balance or no account found")
+
+    logger.info(f"💳 Processing bill payment of ${bill.amount} for bill {bill_id} by user {current_user['username']}")
 
     account.balance -= Decimal(str(bill.amount))
     bill.is_paid = True
@@ -255,6 +266,8 @@ def handle_pay_bill_from_balance(db, current_user, bill_id):
     db.add(transaction)
     db.commit()
     db.refresh(transaction)
+
+    logger.info(f"✅ Bill payment successful: ${bill.amount} paid to {bill.biller_name} (txn_id={transaction.id})")
 
     send_invoice_with_email(transaction, user=current_user, account=account)
     return transaction, account
