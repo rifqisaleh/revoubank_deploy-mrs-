@@ -26,7 +26,7 @@ class MockTransaction:
 def mock_transaction():
     return MockTransaction()
 
-@patch("app.routes.transactions.get_current_user", return_value={"id": 1})
+@patch("app.routes.transactions.get_current_user", return_value={"id": 1, "username": "mock_user"})
 @patch("app.routes.transactions.get_db")
 def test_get_all_transactions(mock_get_db, mock_user, client, mock_transaction):
     session_mock = MagicMock()

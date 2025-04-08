@@ -8,8 +8,7 @@ from sqlalchemy.orm import Session
 from app.model.base import get_db
 from app.model.models import Account, Transaction, User
 from app.core.auth import get_current_user
-from app.services.email.utils import send_email_async
-from app.services.invoice.invoice_generator import generate_invoice
+from app.services.transactions.core import handle_deposit, handle_withdrawal, handle_transfer
 from app.core.authorization import role_required
 
 transactions_bp = Blueprint('transactions', __name__)
@@ -69,99 +68,21 @@ def validate_content_type():
 })
 
 def deposit():
-    """Handles deposits for authenticated users."""
     db = next(get_db())
-    
+    current_user = get_current_user()
+
     if not request.is_json:
-        return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
+        return jsonify({"detail": "Unsupported Media Type"}), 415
 
     try:
         data = request.get_json()
-            
-        if not isinstance(data, dict):
-            return jsonify({"detail": "Invalid request format"}), 400
-
-        amount = data.get("amount")
-        receiver_id = data.get("receiver_id")
-
-        if amount is None or receiver_id is None:
-            return jsonify({"detail": "Missing required fields: amount and receiver_id"}), 400
-
-        try:
-            amount = Decimal(str(amount))
-            receiver_id = int(receiver_id)
-        except (ValueError, TypeError, Decimal.InvalidOperation):
-            return jsonify({"detail": "Invalid amount or receiver_id format"}), 400
-        
+        amount = Decimal(str(data.get("amount")))
+        receiver_id = int(data.get("receiver_id"))
         current_user = get_current_user()
 
-        if amount <= 0:
-            logger.warning(f"⚠️ Invalid deposit amount by user {current_user['username']}")
-            return jsonify({"detail": "Deposit amount must be greater than zero"}), 400
-        
-        logger.info(f"📥 Deposit attempt by user {current_user['username']} to account {receiver_id}")
-        
-        if not current_user:
-            return jsonify({"detail": "Unauthorized"}), 401
+        logger.info(f"📥 Deposit attempt by {current_user['username']} to account {receiver_id}")
 
-        account = db.query(Account).filter_by(id=receiver_id).first()
-        if not account:
-            return jsonify({"detail": "Account not found"}), 404
-            
-        if account.user_id != current_user["id"]:
-            return jsonify({"detail": "Unauthorized to deposit to this account"}), 403
-
-        account.balance += Decimal(str(amount))
-        
-        transaction = Transaction(
-            type="deposit",
-            amount=float(amount),
-            receiver_id=receiver_id
-        )
-        
-        db.add(transaction)
-        db.commit()
-        db.refresh(transaction)
-
-        # Generate invoice
-        invoice_filename = f"invoice_{transaction.id}.pdf"
-        invoice_path = generate_invoice(
-        transaction_details={
-            "id": transaction.id,  # Ensure ID is included
-            "transaction_type": transaction.type,
-            "amount": str(amount),
-            "timestamp": transaction.timestamp.isoformat()
-    },
-        filename=invoice_filename,
-        user=current_user,
-)
-
-
-        # Send email with invoice attachment
-        user_email = current_user.get("email")
-        if user_email:
-            print(f"📧 Sending email to {user_email} with invoice attached")
-
-            send_email_async(
-                subject="Deposit Confirmation & Invoice",
-                recipient=user_email,
-                body=f"""
-                Dear {current_user['username']},
-                
-                Your deposit of ${amount} has been processed successfully.
-                Transaction ID: {transaction.id}
-                New Balance: ${account.balance}
-
-                Please find your invoice attached.
-
-                Thank you for using our service.
-                """,
-                attachment_path=invoice_path  # Attach invoice
-            )
-        else:
-            print("⚠️ No email found for user, skipping email notification.")
-
-        logger.info(f"✅ Deposit of ${amount} successful to account {receiver_id} by user {current_user['username']} - Transaction ID: {transaction.id}")    
+        transaction, account = handle_deposit(db, current_user, amount, receiver_id)
 
         return jsonify({
             "message": "Deposit successful",
@@ -169,9 +90,20 @@ def deposit():
             "balance": account.balance
         })
 
-    except (TypeError, ValueError) as e:
+    except ValueError as e:
         db.rollback()
-        return jsonify({"detail": "Invalid JSON format or data types"}), 400
+        logger.warning(f"⚠️ {e}")
+        return jsonify({"detail": str(e)}), 400
+    except LookupError:
+        db.rollback()
+        return jsonify({"detail": "Account not found"}), 404
+    except PermissionError:
+        db.rollback()
+        return jsonify({"detail": "Unauthorized"}), 403
+    except Exception as e:
+        db.rollback()
+        logger.error("❌ Error during deposit", exc_info=True)
+        return jsonify({"detail": "Internal Server Error"}), 500
 
 
 
@@ -228,79 +160,19 @@ def withdraw():
             return jsonify({"detail": "Missing required fields: amount and sender_id"}), 400
 
         try:
+            data = request.get_json()
             amount = Decimal(str(data["amount"]))
             sender_id = int(data["sender_id"])
+            current_user = get_current_user()
         except (ValueError, TypeError, Decimal.InvalidOperation):
             return jsonify({"detail": "Invalid amount or sender_id format"}), 400
 
-        current_user = get_current_user()
+        transaction, account = handle_withdrawal(db, current_user, amount, sender_id)
 
-        if amount <= 0:
-            logger.warning(f"⚠️ Invalid withdrawal amount by user {get_current_user()['username']}")
-            return jsonify({"detail": "Withdrawal amount must be greater than zero"}), 400
-
-        logger.info(f"💵 Withdrawal attempt by user {current_user['username']} from account {sender_id}")
-        
-        if not current_user:
-            return jsonify({"detail": "Unauthorized"}), 401
-
-        account = db.query(Account).filter_by(id=sender_id).first()
-        if not account or account.user_id != current_user["id"]:
-            return jsonify({"detail": "Account not found or unauthorized"}), 404
-
-        if account.balance < amount:
-            return jsonify({"detail": "Insufficient funds"}), 400
-
-        account.balance -= Decimal(str(amount))
-        
-        transaction = Transaction(
-            type="withdrawal",
-            amount=float(amount),
-            sender_id=sender_id
-        )
-        
-        db.add(transaction)
-        db.commit()
-        db.refresh(transaction)
-
-        # Generate invoice
-        invoice_filename = f"invoice_{transaction.id}.pdf"
-        invoice_path = generate_invoice(
-        transaction_details={
-            "id": transaction.id,  # Ensure ID is included
-            "transaction_type": transaction.type,
-            "amount": str(amount),
-            "timestamp": transaction.timestamp.isoformat()
-    },
-        filename=invoice_filename,
-        user=current_user,
+        logger.info(
+                    f"✅ Withdrawal of ${amount} successful from account {sender_id} by user {current_user['username']} - Transaction ID: {transaction.id}"
 )
 
-    # Send email with invoice attachment
-        user_email = current_user.get("email")
-        if user_email:
-            print(f"📧 Sending email to {user_email} with invoice attached")
-
-            send_email_async(
-                subject="Withdrawal Confirmation & Invoice",
-                recipient=user_email,
-                body=f"""
-                Dear {current_user['username']},
-                
-                Your deposit of ${amount} has been processed successfully.
-                Transaction ID: {transaction.id}
-                New Balance: ${account.balance}
-
-                Please find your invoice attached.
-
-                Thank you for using our service.
-                """,
-                attachment_path=invoice_path  # Attach invoice
-            )
-        else:
-            print("⚠️ No email found for user, skipping email notification.")
-
-        logger.info(f"✅ Withdrawal of ${amount} successful from account {sender_id} by user {current_user['username']} - Transaction ID: {transaction.id}")    
 
         return jsonify({
             "message": "Withdrawal successful",
@@ -365,13 +237,13 @@ def withdraw():
 def transfer():
     """Handles fund transfers between accounts."""
     db = next(get_db())
-    
+
     if not request.is_json:
         return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
 
     try:
         data = request.get_json()
-        
+
         if not data or "sender_id" not in data or "receiver_id" not in data or "amount" not in data:
             return jsonify({"detail": "Missing required fields: sender_id, receiver_id, amount"}), 400
 
@@ -384,119 +256,25 @@ def transfer():
 
         current_user = get_current_user()
 
-        if amount <= 0:
-            logger.warning(f"⚠️ Invalid transfer amount by user {current_user['username']}")
-            return jsonify({"detail": "Transfer amount must be greater than zero"}), 400
+        result = handle_transfer(db, current_user, amount, sender_id, receiver_id)
 
-        logger.info(f"💸 Transfer attempt by user {current_user['username']} from account {sender_id} to account {receiver_id}")
-
-        if not current_user:
-            return jsonify({"detail": "Unauthorized"}), 401
-
-        sender = db.query(Account).filter_by(id=sender_id).first()
-        receiver = db.query(Account).filter_by(id=receiver_id).first()
-
-        if not sender or sender.user_id != current_user["id"]:
-            return jsonify({"detail": "Sender account not found or unauthorized"}), 404
-        if not receiver:
-            return jsonify({"detail": "Receiver account not found"}), 404
-        if sender.balance < amount:
-            return jsonify({"detail": "Insufficient funds"}), 400
-        
-        if sender_id == receiver_id:
-            return jsonify({"detail": "Sender and receiver cannot be the same"}), 400
-
-
-        sender.balance -= Decimal(amount)
-        receiver.balance += Decimal(amount)
-        
-        transaction = Transaction(
-            type="transfer",
-            amount=float(amount),
-            sender_id=sender_id,
-            receiver_id=receiver_id
-        )
-        
-        db.add(transaction)
-        db.commit()
-        db.refresh(transaction)
-
-        # 🔹 Generate invoice AFTER transaction is stored
-        invoice_filename = f"invoice_{transaction.id}.pdf"
-        invoice_path = generate_invoice(
-            transaction_details={
-                "id": transaction.id,
-                "transaction_type": transaction.type,
-                "amount": str(amount),
-                "timestamp": transaction.timestamp.isoformat()
-            },
-            filename=invoice_filename,
-            user=current_user
-        )
-
-        # Get receiver user details
-        receiver_user = db.query(User).filter_by(id=receiver.user_id).first()
-
-        # Send email to sender
-        sender_email = current_user.get("email")
-        if sender_email:
-            print(f"📧 Sending transfer email to {sender_email} with invoice attached")
-
-        send_email_async(
-            subject="Transfer Confirmation - Sent",
-            recipient=sender_email,
-            body=f"""
-                Dear {current_user['username']},
-        
-                Your transfer of ${amount} has been sent successfully.
-                Transaction ID: {transaction.id}
-                New Balance: ${sender.balance}
-
-                Please find your invoice attached.
-
-                Thank you for using our service.
-                """,
-                attachment_path=invoice_path
-            )
-
-
-        # Send email to receiver
-        if receiver_user and receiver_user.email:
-            receiver_email = receiver_user.email
-            print(f"📧 Sending transfer email to {receiver_email} with invoice attached")
-
-            send_email_async(
-                subject="Transfer Confirmation - Received",
-                recipient=receiver_email,
-                body=f"""
-                Dear {receiver_user.username},
-                
-                You have received a transfer of ${amount} from {current_user['username']}.
-                Transaction ID: {transaction.id}
-                New Balance: ${receiver.balance}
-
-                Please find your invoice attached.
-
-                Thank you for using our service.
-                """,
-                attachment_path=invoice_path  # Attach invoice
-            )
+        if isinstance(result, tuple):
+            transaction, sender = result
         else:
-            print("⚠️ No email found for user, skipping email notification.")
-
-        logger.info(f"✅ Transfer of ${amount} successful from account {sender_id} to account {receiver_id} by user {current_user['username']} - Transaction ID: {transaction.id}")
+            # If handle_transfer returns a response instead of transaction
+            return result  
 
         return jsonify({
             "message": "Transfer successful",
             "transaction_id": transaction.id,
-            "sender_balance": sender.balance,
-            "receiver_balance": receiver.balance
+            "sender_balance": sender.balance
         })
 
-    except (TypeError, ValueError) as e:
+    except Exception as e:
         db.rollback()
         logger.error("❌ Error during transfer", exc_info=True)
-        return jsonify({"detail": "Invalid JSON format or data types"}), 400
+        return jsonify({"detail": f"Internal Server Error: {str(e)}"}), 500
+
 
 
 @transactions_bp.route('/', methods=['GET'])

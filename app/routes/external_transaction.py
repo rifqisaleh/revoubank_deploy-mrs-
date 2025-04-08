@@ -9,6 +9,7 @@ from app.model.models import Account, Transaction
 from app.core.auth import get_current_user
 from app.services.email.utils import send_email_async
 from app.services.invoice.invoice_generator import generate_invoice
+from app.services.transactions.core import handle_external_deposit, handle_external_withdrawal
 from app.core.authorization import role_required
 
 external_transaction_bp = Blueprint('external_transaction', __name__)
@@ -63,89 +64,34 @@ def run_background_task(func, *args, **kwargs):
 
 def external_deposit():
     db = next(get_db())
+    current_user = get_current_user()
 
     if not request.is_json:
         logger.warning("❗ Unsupported media type for external deposit request")
         return jsonify({"detail": "Unsupported Media Type"}), 415
 
+    data = request.get_json()
+    required_fields = {"bank_name", "account_number", "amount"}
+    missing = required_fields - set(data.keys())
+    if missing:
+        logger.warning(f"🚫 Missing fields in external deposit: {', '.join(missing)}")
+        return jsonify({"detail": f"Missing fields: {', '.join(missing)}"}), 400
+
     try:
-        data = request.get_json()
-        required_fields = {"bank_name", "account_number", "amount"}
-
-        missing = required_fields - set(data.keys())
-        if missing:
-            logger.warning(f"🚫 Missing fields in external deposit: {', '.join(missing)}")
-            return jsonify({"detail": f"Missing fields: {', '.join(missing)}"}), 400
-
-        amount = Decimal(data["amount"])
-        if amount <= 0:
-            logger.warning(f"🚫 Invalid amount in external deposit: {amount}")
-            return jsonify({"detail": "Amount must be greater than zero"}), 400
-
-        current_user = get_current_user()
-
-        account = db.query(Account).filter_by(user_id=current_user["id"]).first()
-        if not account:
-            logger.warning(f"🧾 Account not found for user {current_user['username']}")
-            return jsonify({"detail": "User account not found"}), 404
-
-        # Update balance
-        account.balance += Decimal(str(amount))
-
-        # Store transaction
-        transaction = Transaction(
-            type="external_deposit",
-            amount=float(amount),
-            receiver_id=account.id,
-            bank_name=data["bank_name"],
-            external_account_number=data["account_number"]
-        )
-
-        db.add(transaction)
-        db.commit()
-        db.refresh(transaction)
-
-        logger.info(
-            f"💸 External deposit of ${amount} from {data['bank_name']} by user {current_user['username']} (txn_id={transaction.id})"
-        )
-
-        # Generate invoice
-        invoice_filename = f"invoice_{transaction.id}.pdf"
-        invoice_path = generate_invoice(
-            transaction_details=transaction.as_dict(),
-            filename=invoice_filename,
-            user=current_user
-        )
-
-        # Send email
-        send_email_async(
-            subject="External Deposit Confirmation & Invoice",
-            recipient=current_user["email"],
-            body=f"""
-            Dear {current_user['username']},
-
-            A deposit of ${amount} was made from {data['bank_name']} into your account.
-            Transaction ID: {transaction.id}
-            New Balance: ${account.balance}
-
-            Invoice is attached.
-
-            Thank you for using RevouBank.
-            """,
-            attachment_path=invoice_path
-        )
+        transaction, account = handle_external_deposit(db, current_user, data)
 
         return jsonify({
-            "message": f"Successfully deposited ${amount} from {data['bank_name']}",
+            "message": f"Successfully deposited ${data['amount']} from {data['bank_name']}",
             "transaction_id": transaction.id,
             "balance": account.balance
         })
 
-    except Exception as e:
+    except ValueError as e:
+        return jsonify({"detail": str(e)}), 400
+    except Exception:
         db.rollback()
-        logger.error("❌ Error during external deposit", exc_info=True)
-        return jsonify({"detail": f"Error: {str(e)}"}), 400
-
+        logger.error("❌ Unhandled error during external deposit", exc_info=True)
+        return jsonify({"detail": "Internal Server Error"}), 500
 
 
 
@@ -194,84 +140,25 @@ def external_deposit():
 
 def external_withdraw():
     db = next(get_db())
+    current_user = get_current_user()
 
     if not request.is_json:
         logger.warning("❗ Unsupported media type for external withdrawal request")
         return jsonify({"detail": "Unsupported Media Type"}), 415
+    
+    data = request.get_json()
+    required_fields = {"bank_name", "account_number", "amount"}
 
+    missing = required_fields - set(data.keys())
+    if missing:
+        logger.warning(f"🚫 Missing fields in external withdrawal: {', '.join(missing)}")
+        return jsonify({"detail": f"Missing fields: {', '.join(missing)}"}), 400
+
+      
     try:
-        data = request.get_json()
-        required_fields = {"bank_name", "account_number", "amount"}
-
-        missing = required_fields - set(data.keys())
-        if missing:
-            logger.warning(f"🚫 Missing fields in external withdrawal: {', '.join(missing)}")
-            return jsonify({"detail": f"Missing fields: {', '.join(missing)}"}), 400
-
-        amount = Decimal(data["amount"])
-        if amount <= 0:
-            logger.warning(f"🚫 Invalid amount in external withdrawal: {amount}")
-            return jsonify({"detail": "Amount must be greater than zero"}), 400
-
-        current_user = get_current_user()
-        account = db.query(Account).filter_by(user_id=current_user["id"]).first()
-
-        if not account:
-            logger.warning(f"🧾 Account not found for user {current_user['username']}")
-            return jsonify({"detail": "User account not found"}), 404
-
-        if account.balance < amount:
-            logger.warning(f"💸 Insufficient funds for user {current_user['username']} - attempted to withdraw ${amount}, balance is ${account.balance}")
-            return jsonify({"detail": "Insufficient balance"}), 400
-
-        # Update balance
-        account.balance -= Decimal(str(amount))
-
-        # Store transaction
-        transaction = Transaction(
-            type="external_withdrawal",
-            amount=float(amount),
-            sender_id=account.id,
-            bank_name=data["bank_name"],
-            external_account_number=data["account_number"]
-        )
-
-        db.add(transaction)
-        db.commit()
-        db.refresh(transaction)
-
-        logger.info(
-            f"💸 External withdrawal of ${amount} to {data['bank_name']} by user {current_user['username']} (txn_id={transaction.id})"
-        )
-
-        # Generate invoice
-        invoice_filename = f"invoice_{transaction.id}.pdf"
-        invoice_path = generate_invoice(
-            transaction_details=transaction.as_dict(),
-            filename=invoice_filename,
-            user=current_user
-        )
-
-        # Send email
-        send_email_async(
-            subject="External Withdrawal Confirmation & Invoice",
-            recipient=current_user["email"],
-            body=f"""
-            Dear {current_user['username']},
-
-            A withdrawal of ${amount} has been made to {data['bank_name']}.
-            Transaction ID: {transaction.id}
-            New Balance: ${account.balance}
-
-            Please find your invoice attached.
-
-            Thank you for using RevouBank.
-            """,
-            attachment_path=invoice_path
-        )
-
+        transaction, account = handle_external_withdrawal(db, current_user, data)
         return jsonify({
-            "message": f"Withdrawal of ${amount} to {data['bank_name']} successful",
+            "message": f"Withdrawal of ${data['amount']} to {data['bank_name']} successful",
             "transaction_id": transaction.id,
             "balance": account.balance
         })
