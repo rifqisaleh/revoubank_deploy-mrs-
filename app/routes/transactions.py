@@ -10,6 +10,7 @@ from app.model.models import Account, Transaction, User
 from app.core.auth import get_current_user
 from app.services.transactions.core import handle_deposit, handle_withdrawal, handle_transfer
 from app.core.authorization import role_required
+from app.utils.pagination import apply_pagination
 
 transactions_bp = Blueprint('transactions', __name__)
 
@@ -298,27 +299,21 @@ def list_transactions():
 
     db = next(get_db())
 
-    # Get the user's accounts
     accounts = db.query(Account).filter_by(user_id=current_user["id"]).all()
     account_ids = [acc.id for acc in accounts]
 
     if not account_ids:
         return jsonify([])
 
-    # Get pagination parameters
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
 
-    # Create a query object first
     transactions_query = db.query(Transaction).filter(
-        (Transaction.sender_id.in_(account_ids)) | 
+        (Transaction.sender_id.in_(account_ids)) |
         (Transaction.receiver_id.in_(account_ids))
     ).order_by(Transaction.timestamp.desc())
 
-    total = transactions_query.count()
-
-    # Apply pagination
-    transactions = transactions_query.offset((page - 1) * per_page).limit(per_page).all()
+    total, transactions = apply_pagination(transactions_query, page, per_page)
 
     return jsonify({
         "total": total,
@@ -326,6 +321,7 @@ def list_transactions():
         "per_page": per_page,
         "transactions": [t.as_dict() for t in transactions]
     })
+
 
 
 @transactions_bp.route('/<int:user_id>', methods=['GET'])

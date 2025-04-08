@@ -3,13 +3,13 @@ from app.core.logger import logger
 from flasgger.utils import swag_from
 from app.model.models import Account
 from app.model.models import db
+from app.model.base import get_db
 from app.core.auth import get_current_user
 from app.core.authorization import role_required
 from app.schemas import AccountCreate, AccountResponse
 from decimal import Decimal
 from datetime import datetime
-from app.services.email.utils import send_email_async
-from app.services.invoice.invoice_generator import generate_invoice
+from app.services.accounts.core import create_account_logic, list_user_accounts_logic, get_user_account_by_id_logic, update_user_account_logic, delete_user_account_logic
 from uuid import uuid4
 
 accounts_bp = Blueprint('accounts', __name__)
@@ -64,6 +64,7 @@ accounts_bp = Blueprint('accounts', __name__)
         "404": {"description": "User not found"}
     }
 })
+
 def create_account():
     if not request.is_json:
         return make_response(jsonify({"detail": "Unsupported Media Type"}), 415)
@@ -73,30 +74,14 @@ def create_account():
         return make_response(jsonify({"detail": "Unauthorized"}), 401)
 
     try:
+        db = next(get_db())
         data = request.get_json()
-        account_data = AccountCreate(**data)
 
-        new_account = Account(
-            user_id=current_user["id"],
-            account_type=account_data.account_type.value,
-            balance=Decimal(str(account_data.initial_balance)),
-            account_number=uuid4().hex[:10]  # <-- Generate account number
-        )
-
-        db.session.add(new_account)
-        db.session.commit()
-
-        return jsonify(AccountResponse(
-            id=new_account.id,
-            user_id=new_account.user_id,
-            account_type=new_account.account_type,
-            balance=float(new_account.balance),
-            account_number=new_account.account_number  # <-- Include account_number in the response
-        ).dict()), 201
+        account_response = create_account_logic(db, current_user, data)
+        return jsonify(account_response.dict()), 201
 
     except Exception as e:
         return make_response(jsonify({"detail": str(e)}), 400)
-
 
 @accounts_bp.route("/", methods=["GET"])
 @role_required("admin")
@@ -109,38 +94,20 @@ def create_account():
         401: {'description': 'Unauthorized'}
     }
 })
-
-def list_accounts():
-    """Retrieves all accounts associated with the authenticated user."""
+def list_user_accounts():
+    db = next(get_db())
     current_user = get_current_user()
-    if not current_user:
-        logger.warning("🔒 Unauthorized access attempt to list accounts")
-        return make_response(jsonify({"detail": "Unauthorized"}), 401)
-    
     try:
-        accounts = Account.query.filter_by(
-            user_id=current_user["id"],
-            is_deleted=False
-        ).all()
-
-        logger.info(f"📄 {len(accounts)} account(s) fetched for user {current_user['username']}")
-
-        return jsonify([
-            AccountResponse(
-                id=acc.id,
-                user_id=acc.user_id,
-                account_type=acc.account_type,
-                balance=float(acc.balance),
-                account_number=acc.account_number
-            ).dict()
-            for acc in accounts
-        ])
-    
+        accounts_data = list_user_accounts_logic(db, current_user)
+        return jsonify(accounts_data)
     except Exception as e:
-        logger.error(f"❌ Error retrieving accounts for user {current_user['username']}", exc_info=True)
-        return make_response(jsonify({"detail": "Internal Server Error"}), 500)
+        logger.error(f"❌ Failed to retrieve accounts: {str(e)}")
+        return jsonify({"detail": "Failed to retrieve accounts"}), 500
+
+
 
 @accounts_bp.route("/<int:id>", methods=["GET"])
+@role_required("user")
 @swag_from({
     'tags': ['accounts'],
     'summary': 'Retrieve a specific account',
@@ -157,28 +124,19 @@ def list_accounts():
 def get_account(id):
     """Fetches details of a specific account for the authenticated user."""
     current_user = get_current_user()
+    db = next(get_db())
+
     if not current_user:
         return make_response(jsonify({"detail": "Unauthorized"}), 401)
 
     try:
-        account = Account.query.filter_by(
-            id=id,
-            user_id=current_user["id"],
-            is_deleted=False
-        ).first()
-
-        if not account:
-            return make_response(jsonify({"detail": "Account not found or unauthorized"}), 404)
-
-        return jsonify(AccountResponse(
-            id=account.id,
-            user_id=account.user_id,
-            account_type=account.account_type,
-            balance=float(account.balance),
-            account_number=account.account_number 
-        ).dict())
+        account_data = get_user_account_by_id_logic(db, current_user, id)
+        return jsonify(account_data)
+    except LookupError as e:
+        return make_response(jsonify({"detail": str(e)}), 404)
     except Exception as e:
         return make_response(jsonify({"detail": str(e)}), 500)
+
 
 @accounts_bp.route("/<int:id>", methods=["PUT"])
 @swag_from({
@@ -225,50 +183,34 @@ def get_account(id):
         "404": {"description": "Account not found or unauthorized"}
     }
 })
-
 def update_account(id):
     """Updates an account for the authenticated user."""
+    db = next(get_db())
+    current_user = get_current_user()
+
     if not request.is_json:
         return make_response(jsonify({"detail": "Unsupported Media Type"}), 415)
-
-    current_user = get_current_user()
     if not current_user:
         return make_response(jsonify({"detail": "Unauthorized"}), 401)
 
     try:
-        account = Account.query.filter_by(
-            id=id,
-            user_id=current_user["id"],
-            is_deleted=False
-        ).first()
-
-        if not account:
-            return make_response(jsonify({"detail": "Account not found or unauthorized"}), 404)
-
-        data = request.get_json()
-        account_update = AccountCreate(**data)
-
-        account.balance = Decimal(str(account_update.initial_balance))
-        account.account_type = account_update.account_type.value
-        
-        db.session.commit()
-
+        update_data = request.get_json()
+        updated_account = update_user_account_logic(db, current_user, id, update_data)
         return jsonify({
             "message": "Account updated successfully",
-            "account": AccountResponse(
-                id=account.id,
-                user_id=account.user_id,
-                account_type=account.account_type,
-                balance=float(account.balance)
-            ).dict()
+            "account": updated_account
         }), 200
 
+    except LookupError as e:
+        return make_response(jsonify({"detail": str(e)}), 404)
     except Exception as e:
-        db.session.rollback()
+        db.rollback()
         return make_response(jsonify({"detail": str(e)}), 400)
 
 
+
 @accounts_bp.route("/<int:id>", methods=["DELETE"])
+@role_required("user")
 @swag_from({
     'tags': ['accounts'],
     'summary': 'Delete an account',
@@ -282,27 +224,20 @@ def update_account(id):
         404: {'description': 'Account not found or unauthorized'}
     }
 })
-
 def delete_account(id):
     """Marks an account as deleted (soft delete) for the authenticated user."""
+    db = next(get_db())
     current_user = get_current_user()
+
     if not current_user:
         return make_response(jsonify({"detail": "Unauthorized"}), 401)
-    
-    try:
-        account = Account.query.filter_by(
-            id=id,
-            user_id=current_user["id"],
-            is_deleted=False
-        ).first()
-        
-        if not account:
-            return make_response(jsonify({"detail": "Account not found or unauthorized"}), 404)
-        
-        account.is_deleted = True
-        db.session.commit()
 
-        return jsonify({"message": "Account marked as deleted, transactions remain intact."})
+    try:
+        result = delete_user_account_logic(db, current_user, id)
+        return jsonify(result)
+    except LookupError as e:
+        return make_response(jsonify({"detail": str(e)}), 404)
     except Exception as e:
-        db.session.rollback()
+        db.rollback()
         return make_response(jsonify({"detail": str(e)}), 500)
+
