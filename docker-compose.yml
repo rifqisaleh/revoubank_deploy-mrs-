@@ -1,28 +1,21 @@
-version: '3.8'
-
 services:
   web:
     build: .
-    container_name: revoubank-web
+    container_name: revoubank-app
+    command: gunicorn -w 4 -b 0.0.0.0:5000 app.main:app
     ports:
       - "5000:5000"
     volumes:
       - .:/app
+    env_file:
+      - .env
     depends_on:
-      - postgres
-
-  postgres:
-    image: postgres:15
-    container_name: revoubank-db
+      - redis
     restart: always
-    environment:
-      POSTGRES_USER: revou
-      POSTGRES_PASSWORD: revou123
-      POSTGRES_DB: revoubank
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
 
-volumes:
-  postgres_data:
+  redis:
+    image: redis:7
+    container_name: revoubank-redis
+    ports:
+      - "6379:6379"
+    restart: always

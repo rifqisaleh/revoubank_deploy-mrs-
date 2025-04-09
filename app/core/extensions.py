@@ -7,10 +7,10 @@ def get_ip():
     return request.headers.get("X-Real-IP") or request.headers.get("X-Forwarded-For") or request.remote_addr
 
 # 🔧 Create Redis client
-redis_client = Redis(host="localhost", port=6379)
+redis_client = Redis(host="redis", port=6379)
 
 # 🔒 Configure Limiter with Redis storage
 limiter = Limiter(
     key_func=get_ip,
-    storage_uri="redis://localhost:6379",  # 👈 tells Flask-Limiter to use Redis
+    storage_uri="redis://redis:6379",  
 )
