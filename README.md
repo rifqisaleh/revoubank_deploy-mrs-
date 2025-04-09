@@ -24,7 +24,7 @@ RevouBank API is a RESTful banking system that provides user management, account
 Note: Due to mailtrap limit, the email and invoice generator are in mock.
 
 To access api docs using Swagger/Flask, visit this link:
-<br> https://final-jacklyn-mrifqiprojects-728a1fab.koyeb.app/docs
+<br> 
 <br> http://127.0.0.1:5000/docs (Local)
 
 ## Features Implemented
