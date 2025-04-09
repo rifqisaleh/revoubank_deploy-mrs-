@@ -2,6 +2,9 @@ import os
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from redis import Redis
+from flask_mail import Mail
+
+mail = Mail()
 
 # ✅ Use environment variable for Redis URI
 storage_uri = os.getenv("REDIS_URL")

@@ -15,6 +15,8 @@ from flask_cors import CORS
 from contextlib import contextmanager
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_mail import Mail
+from app.core.extensions import mail
 from flasgger import swag_from
 
 # Initialize Migrate object
@@ -46,6 +48,7 @@ def create_app(test_config=None):
     jwt.init_app(app)
     db.init_app(app)
     migrate.init_app(app, db)
+    mail.init_app(app)
     log_level = getattr(logging, app.config.get("LOG_LEVEL", "INFO"))
     logger.setLevel(log_level)
     CORS(app)   

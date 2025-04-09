@@ -19,6 +19,7 @@ from sqlalchemy.sql import text
 # Use in-memory SQLite for test database
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
+
 @pytest.fixture(scope="session")
 def app():
     app = create_app()
@@ -27,12 +28,16 @@ def app():
         "SQLALCHEMY_DATABASE_URI": TEST_DATABASE_URL,
         "SQLALCHEMY_TRACK_MODIFICATIONS": False,
         "JWT_SECRET_KEY": "test-secret",
+        "SERVER_NAME": "localhost:5000",  # Ensure external URLs can be generated
     })
 
     with app.app_context():
+        _db.create_all()  # Ensure tables are created
         yield app
+        _db.drop_all()  # Drop the tables after tests
 
 
+# Change the test setup to ensure the database is created and used correctly
 @pytest.fixture(scope="session")
 def test_engine():
     engine = create_engine(
@@ -42,14 +47,10 @@ def test_engine():
     )
     return engine
 
-@pytest.fixture(scope="session")
-def tables(test_engine):
-    _db.metadata.create_all(bind=test_engine)
-    yield
-    _db.metadata.drop_all(bind=test_engine)
 
-@pytest.fixture
-def test_db(test_engine, tables):
+@pytest.fixture(scope="function")
+def test_db(test_engine):
+    """Create a new session with test db"""
     connection = test_engine.connect()
     transaction = connection.begin()
     session = sessionmaker(bind=connection)()
@@ -57,6 +58,28 @@ def test_db(test_engine, tables):
     session.close()
     transaction.rollback()
     connection.close()
+
+
+
+@pytest.fixture(scope="session")
+def tables(test_engine):
+    """Create all tables and clean them up after the tests"""
+    _db.metadata.create_all(bind=test_engine)
+    yield
+    _db.metadata.drop_all(bind=test_engine)
+
+
+@pytest.fixture
+def test_db(test_engine, tables):
+    """Create a new session with test db"""
+    connection = test_engine.connect()
+    transaction = connection.begin()
+    session = sessionmaker(bind=connection)()
+    yield session
+    session.close()
+    transaction.rollback()
+    connection.close()
+
 
 @pytest.fixture
 def client(app, test_db, monkeypatch):
@@ -73,6 +96,7 @@ def client(app, test_db, monkeypatch):
 
     with app.test_client() as client:
         yield client
+
 
 # ✅ Fixed seed function
 def seed_test_data(session):
@@ -93,27 +117,35 @@ def seed_test_data(session):
     session.add_all([user, account, transaction])
     session.commit()
 
+
 @pytest.fixture
 def seeded_db(test_db):
+    """Seed the database with initial data"""
     seed_test_data(test_db)
     return test_db
 
+
 @pytest.fixture(scope="function")
 def init_database(test_engine, test_db):
+    """Setup and cleanup for each test"""
     _db.metadata.create_all(bind=test_engine)
     yield
     test_db.rollback()
     _db.metadata.drop_all(bind=test_engine)
 
+
 @pytest.fixture
 def clean_db(seeded_db):
+    """Cleanup test data between tests"""
     seeded_db.execute(text("DELETE FROM accounts"))
     seeded_db.execute(text("DELETE FROM users"))
     seeded_db.commit()
 
+
 @pytest.fixture
 def test_app(client):
     return client
+
 
 @pytest.fixture
 def test_client(client):

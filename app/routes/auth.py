@@ -8,6 +8,7 @@ from app.model.models import User
 from app.database.dependency import get_db  
 from app.services.email.utils import send_email_async
 from app.core.auth import generate_access_token
+from app.utils.token import confirm_verification_token
 from config import Config
 from datetime import datetime
 
@@ -40,14 +41,17 @@ auth_bp = Blueprint("auth", __name__)
         "403": {"description": "Account is locked"}
     }
 })
+
 def login():
-    form_data = request.form
-    username = form_data.get("username")
-    password = form_data.get("password")
-
-    logger.info(f"🔐 Login attempt for user: {username}")
-
+    username = "<unknown>"  # Fallback value
     try:
+        form_data = request.form
+        username = form_data.get("username")
+        password = form_data.get("password")
+
+        logger.info(f"🔐 Login attempt for user: {username}")
+
+    
         with get_db() as db:
             user = db.query(User).filter_by(username=username).first()
 
@@ -100,7 +104,11 @@ def login():
                     "attempts_left": attempts_left
                 }), 400
 
-            # Successful login
+            if not user.is_verified:
+                logger.warning(f"⚠️ Login blocked: account '{username}' not verified")
+                return jsonify({"detail": "Account not verified. Please check your email."}), 403
+
+            # ✅ Successful login
             user.failed_attempts = 0
             user.is_locked = False
             user.locked_time = None
@@ -113,6 +121,25 @@ def login():
     except Exception as e:
         logger.error(f"🔥 Unexpected error during login for {username}", exc_info=e)
         return jsonify({"detail": "Internal server error"}), 500
+    
+
+@auth_bp.route("/verify/<token>", methods=["GET"])
+def verify_email(token):
+    email = confirm_verification_token(token)
+    if not email:
+        return jsonify({"message": "Invalid or expired verification link."}), 400
+
+    with get_db() as db:
+        user = db.query(User).filter_by(email=email).first()
+        if not user:
+            return jsonify({"message": "User not found."}), 404
+        if user.is_verified:
+            return jsonify({"message": "Account already verified."}), 200
+
+        user.is_verified = True
+        db.commit()
+
+        return jsonify({"message": "✅ Email verified successfully. You can now log in."}), 200    
 
 
 

@@ -8,6 +8,10 @@ from app import db
 from app.utils.user import hash_password
 from app.core.auth import get_current_user
 from app.core.authorization import role_required
+from app.utils.token import generate_verification_token
+from app.services.email.utils import send_email_async
+from flask import url_for
+
 
 
 
@@ -92,6 +96,21 @@ def register_user():
             full_name=user_data.full_name,
             phone_number=user_data.phone_number
         )
+
+        token = generate_verification_token(new_user.email)
+        verify_url = url_for("auth.verify_email", token=token, _external=True)
+
+        send_email_async(
+            subject="Verify Your RevouBank Email",
+            recipient=new_user.email,
+            body=f"""
+                Hello {new_user.username},<br><br>
+                Please verify your email by clicking the link below:<br>
+                <a href="{verify_url}">{verify_url}</a><br><br>
+                This link will expire in 1 hour.
+            """
+        )
+
         db.session.add(new_user)
         db.session.commit()
 

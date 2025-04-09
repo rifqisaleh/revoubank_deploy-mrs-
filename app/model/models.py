@@ -20,6 +20,7 @@ class User(db.Model):
     locked_time = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_verified = db.Column(db.Boolean, default=False)
     
     accounts = db.relationship(
     "Account",

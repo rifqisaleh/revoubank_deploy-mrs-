@@ -1,10 +1,13 @@
 import pytest
-from flask import current_app
+import uuid
+from flask import current_app, url_for
 from app.model.models import User, Account
 from app.routes.accounts import accounts_bp
 from unittest.mock import patch, MagicMock
 from app.routes import accounts as accounts_module
 from flask_jwt_extended import create_access_token
+from app.services.email.utils import send_email_async
+from app.utils.token import generate_verification_token
 
 @pytest.fixture
 def test_user(test_db):
@@ -120,3 +123,58 @@ def test_list_user_accounts_with_pagination(mock_verify, mock_get_jwt, mock_get_
 
     assert response.status_code == 200
     assert response.json["accounts"][0]["account_number"] == "abc123"
+
+
+@patch("app.routes.users.send_email_async")  # Patch where send_email_async is being used
+def test_register_user_sends_email(mock_send_email, test_db, client):
+    # Register a new user
+    response = client.post('/users/', json={
+        "email": "testuser@mail.com",
+        "full_name": "Test User",
+        "password": "TestPassword123",
+        "phone_number": "081234567890",
+        "username": "testuser"
+    })
+
+    # Ensure registration succeeded
+    assert response.status_code == 201
+    assert response.json["email"] == "testuser@mail.com"
+    
+    # Check that the mock email sending function was called
+    mock_send_email.assert_called_once()  # Ensure the email sending was triggered
+
+
+@patch("app.routes.users.send_email_async")  # Patch send_email_async where it's used in app/routes/users.py
+def test_verify_email(mock_send_email, client):
+    # Generate a unique username for each test run
+    unique_username = f"testuser_{uuid.uuid4().hex}"
+    unique_email = f"{uuid.uuid4().hex}@test.com"  # Unique email address
+
+    # Register a new user
+    response = client.post('/users/', json={
+        "email": unique_email,
+        "full_name": "Test User",
+        "password": "TestPassword123",
+        "phone_number": "081234567890",
+        "username": unique_username  # Use the unique username
+    })
+    
+    print("Registration Response Data:", response.get_data(as_text=True))
+    
+    # Ensure registration succeeded
+    assert response.status_code == 201
+    assert response.json["email"] == unique_email  # Compare to the unique email used in the test
+
+    # Get the actual token from the registration response
+    user_data = response.json
+    token = generate_verification_token(user_data['email'])  # Replace with real token generation
+
+    # Generate the verification URL using the token
+    verify_url = url_for('auth.verify_email', token=token, _external=True)
+
+    # Simulate email verification process
+    response = client.get(verify_url)
+
+    # Check that email verification worked
+    assert response.status_code == 200
+    assert "Email verified successfully" in response.get_data(as_text=True)
