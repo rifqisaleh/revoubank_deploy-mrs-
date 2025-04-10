@@ -11,9 +11,19 @@ from app.core.auth import generate_access_token
 from app.utils.token import confirm_verification_token
 from config import Config
 from datetime import datetime
+from collections import OrderedDict
 
 
 auth_bp = Blueprint("auth", __name__)
+
+login_schema = {
+    "type": "object",
+    "properties": OrderedDict([
+        ("username", {"type": "string"}),
+        ("password", {"type": "string"})
+    ]),
+    "required": ["username", "password"]
+    }
 
 # Login
 @auth_bp.route("/login", methods=["POST"])
@@ -23,18 +33,20 @@ auth_bp = Blueprint("auth", __name__)
     "summary": "Login. Authenticate user and generate JWT token",
     "parameters": [
         {
-            "name": "username",
-            "in": "formData",
-            "type": "string",
-            "required": True
-        },
-        {
-            "name": "password",
-            "in": "formData",
-            "type": "string",
-            "required": True
+            "name": "body",
+            "in": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "username": {"type": "string"},
+                    "password": {"type": "string"}
+                },
+                "required": ["username", "password"]
+            }
         }
     ],
+    "consumes": ["application/json"],
     "responses": {
         "200": {"description": "Returns access token"},
         "400": {"description": "Incorrect username or password"},
@@ -45,13 +57,14 @@ auth_bp = Blueprint("auth", __name__)
 def login():
     username = "<unknown>"  # Fallback value
     try:
-        form_data = request.form
-        username = form_data.get("username")
-        password = form_data.get("password")
+        data = request.get_json()
+        username = data.get("username")
+        password = data.get("password")
+
 
         logger.info(f"🔐 Login attempt for user: {username}")
 
-    
+        # Check if the user exists
         with get_db() as db:
             user = db.query(User).filter_by(username=username).first()
 
@@ -62,6 +75,7 @@ def login():
                     "attempts_left": Config.MAX_FAILED_ATTEMPTS
                 }), 400
 
+            # If account is locked, handle the lock logic
             if user.is_locked:
                 if user.locked_time and datetime.utcnow() > user.locked_time + Config.LOCK_DURATION:
                     user.is_locked = False
@@ -74,13 +88,13 @@ def login():
                         "detail": "Account is locked due to multiple failed login attempts. Please try again later."
                     }), 403
 
+            # Check the password
             if not verify_password(password, user.password):
                 user.failed_attempts += 1
 
                 if user.failed_attempts >= Config.MAX_FAILED_ATTEMPTS:
                     user.is_locked = True
                     user.locked_time = datetime.utcnow()
-
                     send_email_async(
                         subject="Your RevouBank Account is Locked",
                         recipient=user.email,
@@ -94,7 +108,6 @@ def login():
                         """
                     )
                     logger.warning(f"🔒 Account locked due to too many failed attempts: {username}")
-
                 db.commit()
 
                 attempts_left = max(0, Config.MAX_FAILED_ATTEMPTS - user.failed_attempts)
@@ -104,11 +117,12 @@ def login():
                     "attempts_left": attempts_left
                 }), 400
 
+            # Verify email before logging in
             if not user.is_verified:
                 logger.warning(f"⚠️ Login blocked: account '{username}' not verified")
                 return jsonify({"detail": "Account not verified. Please check your email."}), 403
 
-            # ✅ Successful login
+            # If verification is successful, clear any failed attempts and proceed with login
             user.failed_attempts = 0
             user.is_locked = False
             user.locked_time = None
@@ -121,7 +135,7 @@ def login():
     except Exception as e:
         logger.error(f"🔥 Unexpected error during login for {username}", exc_info=e)
         return jsonify({"detail": "Internal server error"}), 500
-    
+
 
 @auth_bp.route("/verify/<token>", methods=["GET"])
 def verify_email(token):

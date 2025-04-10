@@ -339,50 +339,6 @@ def list_transactions():
     })
 
 
-
-@transactions_bp.route('/<int:user_id>', methods=['GET'])
-@swag_from({
-    'tags': ['transactions'],
-    'summary': 'Retrieve transaction by ID',
-    'description': 'Fetches details of a specific transaction by ID.',
-    'parameters': [
-        {'name': 'id', 'in': 'path', 'type': 'integer', 'required': True}
-    ],
-    'responses': {
-        200: {'description': 'Transaction details retrieved successfully'},
-        404: {'description': 'Transaction not found'}
-    },
-    'security': [{"Bearer": []}]  # 🔒 Require authentication
-})
-
-def get_transaction_for_user(user_id):
-    """Fetches a specific transaction by user ID."""
-    current_user = get_current_user()
-
-    if not current_user or current_user["id"] != user_id:
-        logger.warning(f"⛔ User {current_user['username']} attempted to access transactions belonging to another user")
-        return jsonify({"detail": "Unauthorized"}), 401
-    
-    logger.info(f"🔍 Transactions retrieved for user {current_user['username']}")
-
-    db = next(get_db())
-
-    # 🔍 DEBUG: Show all account IDs for the user
-    accounts = db.query(Account).filter_by(user_id=user_id).all()
-    account_ids = [acc.id for acc in accounts]
-    
-
-    # 🔍 DEBUG: Show matching transactions
-    transactions = db.query(Transaction).filter(
-        (Transaction.sender_id.in_(account_ids)) |
-        (Transaction.receiver_id.in_(account_ids))
-    ).all()
-    
-
-    return jsonify([t.as_dict() for t in transactions])
-
-
-
 @transactions_bp.route('/check-balance/', methods=['GET'])
 @role_required('user')
 @swag_from({
@@ -431,7 +387,7 @@ def check_balance():
     'security': [{"Bearer": []}]  # 🔒 Require authentication
 })
 
-def check_transaction_balance(id):
+def check_transaction_balance_by_id(id):
     """Fetch the balance of a specific transaction."""
     current_user = get_current_user()
 
