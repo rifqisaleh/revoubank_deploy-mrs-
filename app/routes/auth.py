@@ -125,6 +125,7 @@ def login():
 
 @auth_bp.route("/verify/<token>", methods=["GET"])
 def verify_email(token):
+    print("verify_email using get_db:", get_db)
     email = confirm_verification_token(token)
     if not email:
         return jsonify({"message": "Invalid or expired verification link."}), 400

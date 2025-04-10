@@ -2,7 +2,9 @@ import pytest
 from app.core.auth import authenticate_user
 from app.utils.user import hash_password
 from app.model.models import User  # Import the User class
+from app.utils.token import generate_verification_token
 from flask import url_for  # Import url_for for generating URLs
+from unittest.mock import patch
 
 def test_authenticate_valid_user(test_db):
     user = User(
@@ -48,8 +50,10 @@ def test_login_blocked_for_unverified_user(client):
     assert "Account not verified. Please check your email." in login_response.get_data(as_text=True)
 
 
-def test_login_after_verification(client, mock_send_email):
-    # Register user and mock email sending
+
+@patch("app.routes.users.send_email_async")
+def test_login_after_verification(mock_send_email, client):
+    # Register a new user
     response = client.post('/users/', json={
         "email": "verifieduser@mail.com",
         "full_name": "Verified User",
@@ -57,19 +61,19 @@ def test_login_after_verification(client, mock_send_email):
         "phone_number": "081234567890",
         "username": "verifieduser"
     })
-    
-    # Simulate email verification process (you'll need to get the actual token here)
-    token = "actual_token_from_email_verification"  # Replace with real token extraction logic
-    verify_url = url_for('auth.verify_email', token=token, _external=True)
-    client.get(verify_url)  # Confirm the email
 
-    # Now try logging in after verification
+    assert response.status_code == 201
+
+    # Simulate email verification
+    token = generate_verification_token("verifieduser@mail.com")
+    verify_url = url_for('auth.verify_email', token=token, _external=True)
+    client.get(verify_url)
+
+    # Try login
     login_response = client.post('/login', data={
         "username": "verifieduser",
         "password": "Verified123"
     })
 
-    # Assert successful login
     assert login_response.status_code == 200
-    assert "access_token" in login_response.json  # Ensure access token is returned
-
+    assert "access_token" in login_response.json
