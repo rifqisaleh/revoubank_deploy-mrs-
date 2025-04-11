@@ -30,41 +30,41 @@ def mock_transaction():
 @patch("app.routes.transactions.get_db")
 def test_get_all_transactions(mock_get_db, mock_user, client, mock_transaction):
     session_mock = MagicMock()
-    mock_account_query = MagicMock()
-    mock_transaction_query = MagicMock()
 
-    account_mock = MagicMock()
-    account_mock.id = 123
+    # Setup account that belongs to current user
+    mock_account = MagicMock()
+    mock_account.id = 1
 
-    mock_account_query.filter_by.return_value.all.return_value = [account_mock]
-    mock_transaction_query.filter.return_value.all.return_value = [mock_transaction]
+    # Setup query().filter_by(user_id=...).all() to return this account
+    account_query = MagicMock()
+    account_query.filter_by.return_value.all.return_value = [mock_account]
 
+    # Setup transaction mock
+    mock_transaction.account_id = 1
+    transaction_query = MagicMock()
+    transaction_query.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [mock_transaction]
+    transaction_query.filter.return_value.order_by.return_value.count.return_value = 1
 
+    # Dispatch correct query mocks
     def query_side_effect(model):
-        print("📦 model received by .query():", model, type(model), getattr(model, '__name__', 'NO NAME'))
-
-        if isinstance(model, type) and getattr(model, '__name__', None) == "Account":
-            print("✅ Returning mock_account_query")
-            return mock_account_query
-        elif isinstance(model, type) and getattr(model, '__name__', None) == "Transaction":
-            print("✅ Returning mock_transaction_query")
-            return mock_transaction_query
-        print("❌ Unknown model:", model)
+        if model.__name__ == "Account":
+            return account_query
+        elif model.__name__ == "Transaction":
+            return transaction_query
         return MagicMock()
 
     session_mock.query.side_effect = query_side_effect
-
-    # 🔥 This is the key line for next(get_db())
     mock_get_db.return_value.__next__.return_value = session_mock
 
-    response = client.get("/transactions/1")
+    response = client.get("/transactions/?page=1&per_page=1")
 
     print("🔥 Final debug response:", response.get_json())
 
     assert response.status_code == 200
-    assert response.get_json() == [mock_transaction.as_dict()]
-
-
+    data = response.get_json()
+    assert data["total"] == 1
+    assert len(data["transactions"]) == 1
+    assert data["transactions"][0]["id"] == mock_transaction.id
 
 
 @patch("app.routes.transactions.get_current_user", return_value={"id": 1})

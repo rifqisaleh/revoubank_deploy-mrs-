@@ -10,15 +10,19 @@ from app.utils.email_invoice import send_invoice_with_email
 from app.utils.verification import verify_card_number
 
 def handle_deposit(db, current_user, amount, receiver_id):
+    logger.info(f"💰 Deposit attempt of ${amount} by user {current_user['username']} to account {receiver_id}")
     
     if amount <= 0:
+        logger.warning(f"⚠️ Invalid deposit amount ${amount} by user {current_user['username']}")
         raise ValueError("Amount must be greater than zero")
 
     account = db.query(Account).filter_by(id=receiver_id).first()
     if not account:
+        logger.error(f"❌ Account {receiver_id} not found for deposit by user {current_user['username']}")
         raise LookupError("Account not found")
 
     if account.user_id != current_user["id"]:
+        logger.warning(f"🚫 Unauthorized deposit attempt to account {receiver_id} by user {current_user['username']}")
         raise PermissionError("Unauthorized to deposit to this account")
 
     account.balance += Decimal(str(amount))
@@ -123,12 +127,16 @@ def handle_transfer (db, current_user, amount, sender_id, receiver_id):
 
 
 def handle_external_deposit(db, current_user, data):
+    logger.info(f"🏦 External deposit attempt of ${data['amount']} from {data['bank_name']} by user {current_user['username']}")
+    
     amount = Decimal(data["amount"])
     if amount <= 0:
+        logger.warning(f"⚠️ Invalid external deposit amount ${amount} by user {current_user['username']}")
         raise ValueError("Amount must be greater than zero")
     
     account = db.query(Account).filter_by(user_id=current_user["id"]).first()
     if not account:
+        logger.error(f"❌ Account not found for external deposit by user {current_user['username']}")
         raise ValueError("User account not found")
 
     account.balance += amount
@@ -155,13 +163,21 @@ def handle_external_deposit(db, current_user, data):
 
 
 def handle_external_withdrawal(db, current_user, data):
+    logger.info(f"🏦 External withdrawal attempt of ${data['amount']} to {data['bank_name']} by user {current_user['username']}")
+    
     amount = Decimal(data["amount"])
     if amount <= 0:
+        logger.warning(f"⚠️ Invalid external withdrawal amount ${amount} by user {current_user['username']}")
         raise ValueError("Amount must be greater than zero")
     
     account = db.query(Account).filter_by(user_id=current_user["id"]).first()
     if not account:
+        logger.error(f"❌ Account not found for external withdrawal by user {current_user['username']}")
         raise ValueError("User account not found")
+    
+    if account.balance < amount:
+        logger.warning(f"⚠️ Insufficient funds for external withdrawal by user {current_user['username']}")
+        raise ValueError("Insufficient funds")
     
     account.balance -= Decimal(str(amount))
 

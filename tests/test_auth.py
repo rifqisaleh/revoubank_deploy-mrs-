@@ -40,8 +40,8 @@ def test_login_blocked_for_unverified_user(client):
     })
 
     # Login with the newly registered user (but not verified)
-    login_response = client.post('/login', data={
-        "username": "unverified",
+    login_response = client.post('/login', json={
+        "username": "unverified",  # Fixed: use the same username as registered
         "password": "Unverified123"
     })
 
@@ -70,8 +70,8 @@ def test_login_after_verification(mock_send_email, client):
     client.get(verify_url)
 
     # Try login
-    login_response = client.post('/login', data={
-        "username": "verifieduser",
+    login_response = client.post('/login', json={
+        "username": "verifieduser",  # Fixed: use the same username as registered
         "password": "Verified123"
     })
 

@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flasgger.utils import swag_from
+from app.core.logger import logger
 from app.model.base import get_db
 from app.core.auth import get_current_user
 from app.core.authorization import role_required
@@ -92,11 +93,14 @@ def update_category(category_id):
     category = db.query(TransactionCategory).filter_by(id=category_id, user_id=current_user["id"]).first()
 
     if not category:
+        logger.warning(f"User {current_user['id']} attempted to update non-existent category {category_id}")
         return jsonify({"detail": "Category not found"}), 404
 
     data = request.get_json()
     if "name" in data:
+        old_name = category.name
         category.name = data["name"]
+        logger.info(f"User {current_user['id']} updated category {category_id} name from '{old_name}' to '{data['name']}'")
     db.commit()
     return jsonify({"message": "Category updated"})
 
@@ -120,8 +124,10 @@ def delete_category(category_id):
     category = db.query(TransactionCategory).filter_by(id=category_id, user_id=current_user["id"]).first()
 
     if not category:
+        logger.warning(f"User {current_user['id']} attempted to delete non-existent category {category_id}")
         return jsonify({"detail": "Category not found"}), 404
 
+    logger.info(f"User {current_user['id']} deleted category {category_id} ({category.name})")
     db.delete(category)
     db.commit()
     return jsonify({"message": "Category deleted"})

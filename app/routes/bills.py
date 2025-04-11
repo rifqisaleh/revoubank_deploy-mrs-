@@ -6,6 +6,9 @@ from app.core.authorization import role_required
 from app.model.models import Bill
 from decimal import Decimal
 from datetime import datetime
+from app.core.logger import logger
+
+
 
 bills_bp = Blueprint("bills", __name__, url_prefix="/bills")
 
@@ -41,6 +44,7 @@ def create_bill():
     db = next(get_db())
     data = request.get_json()
     current_user = get_current_user()
+    logger.info(f"Attempting to create bill for user {current_user['id']}")
 
     try:
         bill = Bill(
@@ -52,9 +56,11 @@ def create_bill():
         )
         db.add(bill)
         db.commit()
+        logger.info(f"Bill {bill.id} created successfully for user {current_user['id']}")
         return jsonify({"message": "Bill created", "bill_id": bill.id}), 200
 
     except Exception as e:
+        logger.error(f"Error creating bill for user {current_user['id']}: {str(e)}")
         db.rollback()
         return jsonify({"detail": str(e)}), 400
 
@@ -71,15 +77,21 @@ def create_bill():
 def get_bills():
     db = next(get_db())
     current_user = get_current_user()
-    bills = db.query(Bill).filter_by(user_id=current_user["id"]).all()
-
-    return jsonify([{
-        "id": bill.id,
-        "biller_name": bill.biller_name,
-        "due_date": bill.due_date.isoformat(),
-        "amount": float(bill.amount),
-        "is_paid": bill.is_paid
-    } for bill in bills]), 200
+    logger.info(f"Fetching all bills for user {current_user['id']}")
+    
+    try:
+        bills = db.query(Bill).filter_by(user_id=current_user["id"]).all()
+        logger.info(f"Successfully retrieved {len(bills)} bills for user {current_user['id']}")
+        return jsonify([{
+            "id": bill.id,
+            "biller_name": bill.biller_name,
+            "due_date": bill.due_date.isoformat(),
+            "amount": float(bill.amount),
+            "is_paid": bill.is_paid
+        } for bill in bills]), 200
+    except Exception as e:
+        logger.error(f"Error fetching bills for user {current_user['id']}: {str(e)}")
+        return jsonify({"detail": "Error fetching bills"}), 500
 
 
 @bills_bp.route("/<int:bill_id>", methods=["PUT"])
@@ -116,22 +128,31 @@ def get_bills():
 def update_bill(bill_id):
     db = next(get_db())
     current_user = get_current_user()
+    logger.info(f"Attempting to update bill {bill_id} for user {current_user['id']}")
+
     bill = db.query(Bill).filter_by(id=bill_id, user_id=current_user["id"]).first()
 
     if not bill:
+        logger.warning(f"Bill {bill_id} not found for user {current_user['id']}")
         return jsonify({"detail": "Bill not found"}), 404
 
-    data = request.get_json()
+    try:
+        data = request.get_json()
 
-    if "biller_name" in data:
-        bill.biller_name = data["biller_name"]
-    if "due_date" in data:
-        bill.due_date = datetime.fromisoformat(data["due_date"])
-    if "amount" in data:
-        bill.amount = Decimal(data["amount"])
+        if "biller_name" in data:
+            bill.biller_name = data["biller_name"]
+        if "due_date" in data:
+            bill.due_date = datetime.fromisoformat(data["due_date"])
+        if "amount" in data:
+            bill.amount = Decimal(data["amount"])
 
-    db.commit()
-    return jsonify({"message": "Bill updated"}), 200
+        db.commit()
+        logger.info(f"Bill {bill_id} successfully updated by user {current_user['id']}")
+        return jsonify({"message": "Bill updated"}), 200
+    except Exception as e:
+        logger.error(f"Error updating bill {bill_id}: {str(e)}")
+        db.rollback()
+        return jsonify({"detail": "Error updating bill"}), 500
 
 
 @bills_bp.route("/<int:bill_id>", methods=["DELETE"])
@@ -156,11 +177,20 @@ def update_bill(bill_id):
 def delete_bill(bill_id):
     db = next(get_db())
     current_user = get_current_user()
+    logger.info(f"Attempting to delete bill {bill_id} for user {current_user['id']}")
+    
     bill = db.query(Bill).filter_by(id=bill_id, user_id=current_user["id"]).first()
 
     if not bill:
+        logger.warning(f"Bill {bill_id} not found for user {current_user['id']}")
         return jsonify({"detail": "Bill not found"}), 404
 
-    db.delete(bill)
-    db.commit()
-    return jsonify({"message": "Bill deleted"}), 200
+    try:
+        db.delete(bill)
+        db.commit()
+        logger.info(f"Bill {bill_id} successfully deleted by user {current_user['id']}")
+        return jsonify({"message": "Bill deleted"}), 200
+    except Exception as e:
+        logger.error(f"Error deleting bill {bill_id}: {str(e)}")
+        db.rollback()
+        return jsonify({"detail": "Error deleting bill"}), 500
