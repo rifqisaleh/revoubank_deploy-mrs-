@@ -13,7 +13,7 @@ budgets_bp = Blueprint("budgets", __name__, url_prefix="/budgets")
 @budgets_bp.route("/", methods=["POST"])
 @role_required('user')
 @swag_from({
-    "tags": ["budgets"],
+    "tags": ["Budgets"],
     "summary": "Create a new budget",
     "parameters": [
         {
@@ -61,7 +61,7 @@ def create_budget():
 
 @budgets_bp.route("/", methods=["GET"])
 @swag_from({
-    "tags": ["budgets"],
+    "tags": ["Budgets"],
     "summary": "Get all budgets",
     "responses": {
         "200": {"description": "List of budgets"}
@@ -89,7 +89,7 @@ def get_budgets():
 @budgets_bp.route("/<int:budget_id>", methods=["PUT"])
 @role_required('user')
 @swag_from({
-    "tags": ["budgets"],
+    "tags": ["Budgets"],
     "summary": "Update a budget",
     "parameters": [
         {"name": "budget_id", "in": "path", "type": "integer", "required": True},
@@ -141,7 +141,7 @@ def update_budget(budget_id):
 @budgets_bp.route("/<int:budget_id>", methods=["DELETE"])
 @role_required('user')
 @swag_from({
-    "tags": ["budgets"],
+    "tags": ["Budgets"],
     "summary": "Delete a budget",
     "parameters": [
         {"name": "budget_id", "in": "path", "type": "integer", "required": True}

@@ -32,7 +32,7 @@ def validate_content_type():
 @transactions_bp.route('/deposit/', methods=['POST'])
 @role_required('user')
 @swag_from({
-    "tags": ["transactions"],
+    "tags": ["Transactions"],
     "summary": "Deposit Money",
     "description": "Deposits money into a user account.",
     "consumes": ["application/json"],  # ✅ Force Swagger to recognize JSON input
@@ -69,6 +69,7 @@ def validate_content_type():
 })
 
 def deposit():
+    """Handles Deposit for authenticated users."""
     db = next(get_db())
     current_user = get_current_user()
 
@@ -111,14 +112,14 @@ def deposit():
 @transactions_bp.route('/withdraw/', methods=['POST'])
 @role_required('user')
 @swag_from({
-    "tags": ["transactions"],
+    "tags": ["Transactions"],
     "summary": "Withdraw Money",
     "description": "Withdraws money from a user account.",
-    "consumes": ["application/json"],  # ✅ Ensure Swagger UI accepts JSON input
+    "consumes": ["application/json"],
     "produces": ["application/json"],
     "parameters": [
         {
-            "in": "body",  # ✅ Forces Swagger UI to show input fields
+            "in": "body",  
             "name": "body",
             "required": True,
             "schema": {
@@ -194,7 +195,7 @@ def withdraw():
 @transactions_bp.route('/transfer/', methods=['POST'])
 @role_required('user')
 @swag_from({
-    "tags": ["transactions"],
+    "tags": ["Transactions"],
     "summary": "Transfer Money",
     "description": "Transfers money between two accounts.",
     "consumes": ["application/json"],  # ✅ Ensure Swagger UI accepts JSON input
@@ -280,7 +281,7 @@ def transfer():
 
 @transactions_bp.route('/', methods=['GET'])
 @swag_from({
-    'tags': ['transactions'],
+    "tags": ["Transactions"],
     'summary': 'List Transactions',
     'description': 'Fetches all transactions associated with the authenticated user.',
     'parameters': [
@@ -342,7 +343,7 @@ def list_transactions():
 @transactions_bp.route('/check-balance/', methods=['GET'])
 @role_required('user')
 @swag_from({
-    'tags': ['transactions'],
+    "tags": ["Transactions"],
     'summary': 'Check Account Balance',
     'description': 'Fetches the balance of a user account.',
     'parameters': [
@@ -374,7 +375,7 @@ def check_balance():
 
 @transactions_bp.route('/<int:id>/check-balance', methods=['GET'])
 @swag_from({
-    'tags': ['transactions'],
+    "tags": ["Transactions"],
     'summary': 'Check balance for a specific transaction',
     'description': 'Fetches the balance related to a specific transaction.',
     'parameters': [

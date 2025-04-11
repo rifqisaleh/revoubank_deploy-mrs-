@@ -16,7 +16,7 @@ bills_bp = Blueprint("bills", __name__, url_prefix="/bills")
 @bills_bp.route("/", methods=["POST"])
 @role_required('user')
 @swag_from({
-    "tags": ["bills"],
+    "tags": ["Bills"],
     "summary": "Create a new bill",
     "parameters": [
         {
@@ -68,7 +68,7 @@ def create_bill():
 @bills_bp.route("/", methods=["GET"])
 @role_required('user')
 @swag_from({
-    "tags": ["bills"],
+    "tags": ["Bills"],
     "summary": "Get all bills for current user",
     "responses": {
         "200": {"description": "List of bills"}
@@ -97,7 +97,7 @@ def get_bills():
 @bills_bp.route("/<int:bill_id>", methods=["PUT"])
 @role_required('user')
 @swag_from({
-    "tags": ["bills"],
+    "tags": ["Bills"],
     "summary": "Update a bill",
     "parameters": [
         {
@@ -158,7 +158,7 @@ def update_bill(bill_id):
 @bills_bp.route("/<int:bill_id>", methods=["DELETE"])
 @role_required('user')
 @swag_from({
-    "tags": ["bills"],
+    "tags": ["Bills"],
     "summary": "Delete a bill",
     "parameters": [
         {

@@ -22,7 +22,7 @@ def run_background_task(func, *args, **kwargs):
 @external_transaction_bp.route("/external/deposit/", methods=["POST"])
 @role_required('user')
 @swag_from({
-    "tags": ["external transactions"],
+    "tags": ["External Transactions"],
     "summary": "Deposit from external bank",
     "description": "Handles deposits from an external bank account into a RevouBank account.",
     "consumes": ["application/json"],
@@ -63,6 +63,7 @@ def run_background_task(func, *args, **kwargs):
 })
 
 def external_deposit():
+    """Handles Deposit from external bank."""
     db = next(get_db())
     current_user = get_current_user()
 
@@ -98,7 +99,7 @@ def external_deposit():
 @external_transaction_bp.route("/external/withdraw/", methods=["POST"])
 @role_required('user')
 @swag_from({
-    "tags": ["external transactions"],
+    "tags": ["External Transactions"],
     "summary": "Withdraw to external bank",
     "description": "Handles withdrawals from a RevouBank account to an external bank account.",
     "consumes": ["application/json"],
@@ -139,6 +140,7 @@ def external_deposit():
 })
 
 def external_withdraw():
+    """Handles withdrawal to external bank."""
     db = next(get_db())
     current_user = get_current_user()
 

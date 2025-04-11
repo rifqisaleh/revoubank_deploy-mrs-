@@ -14,7 +14,7 @@ billpayment_bp = Blueprint('billpayment', __name__, url_prefix="/bills")
 @billpayment_bp.route("/<int:bill_id>/pay/card", methods=["POST"])
 @role_required('user')
 @swag_from({
-    "tags": ["bill payment"],
+    "tags": ["Bill Payment"],
     "summary": "Pay a bill using a credit card",
     "description": "Allows users to pay their bills using a credit card.",
     "consumes": ["application/json"],
@@ -51,6 +51,7 @@ billpayment_bp = Blueprint('billpayment', __name__, url_prefix="/bills")
 })
 
 def pay_bill_with_card(bill_id):
+    """Handles bill payment using a credit card."""
     db = next(get_db())
     try:
         current_user = get_current_user()
@@ -82,7 +83,7 @@ def pay_bill_with_card(bill_id):
 @billpayment_bp.route("/<int:bill_id>/pay", methods=["POST"])
 @role_required('user')
 @swag_from({
-    "tags": ["bill payment"],
+    "tags": ["Bill Payment"],
     "summary": "Pay a bill using account balance",
     "description": "Allows users to pay their bills using their account balance.",
     "consumes": ["application/json"],
@@ -104,6 +105,7 @@ def pay_bill_with_card(bill_id):
 })
 
 def pay_bill_from_balance(bill_id):
+    """Handles bill payment using current user's account balance."""
     db = next(get_db())
     try:
         current_user = get_current_user()

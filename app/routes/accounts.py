@@ -19,7 +19,7 @@ accounts_bp = Blueprint('accounts', __name__)
 @accounts_bp.route("/", methods=["POST"])
 @role_required("user")
 @swag_from({
-    "tags": ["accounts"],
+    "tags": ["Accounts"],
     "summary": "Create a new bank account",
     "description": "Creates a bank account for an authenticated user.",
     "consumes": ["application/json"],
@@ -87,7 +87,7 @@ def create_account():
 @accounts_bp.route("/", methods=["GET"])
 @role_required("admin")
 @swag_from({
-    'tags': ['accounts'],
+    'tags': ['Accounts'],
     'summary': 'List user accounts',
     'description': 'Retrieves all bank accounts associated with the authenticated user.',
     'parameters': [
@@ -123,7 +123,7 @@ def list_user_accounts():
 @accounts_bp.route("/<int:id>", methods=["GET"])
 @role_required("user")
 @swag_from({
-    'tags': ['accounts'],
+    'tags': ['Accounts'],
     'summary': 'Retrieve a specific account',
     'description': 'Fetches details of a specific account owned by the authenticated user.',
     'parameters': [
@@ -154,7 +154,7 @@ def get_account(id):
 
 @accounts_bp.route("/<int:id>", methods=["PUT"])
 @swag_from({
-    "tags": ["accounts"],
+    "tags": ["Accounts"],
     "summary": "Update an account",
     "description": "Updates account details (such as balance) for an authenticated user.",
     "consumes": ["application/json"],
@@ -226,7 +226,7 @@ def update_account(id):
 @accounts_bp.route("/<int:id>", methods=["DELETE"])
 @role_required("user")
 @swag_from({
-    'tags': ['accounts'],
+    'tags': ['Accounts'],
     'summary': 'Delete an account',
     'description': 'Deletes an account for the authenticated user (soft delete).',
     'parameters': [

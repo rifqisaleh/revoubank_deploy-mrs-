@@ -126,4 +126,4 @@ class Bill(db.Model):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     
-    account = db.relationship('Account', backref='bills', cascade="all, delete-orphan", single_parent=True)
+    account = db.relationship('Account', backref='bills')

@@ -12,7 +12,7 @@ categories_bp = Blueprint("categories", __name__, url_prefix="/categories")
 @categories_bp.route("/", methods=["POST"])
 @role_required('user')
 @swag_from({
-    "tags": ["transaction categories"],
+    "tags": ["Transaction Categories"],
     "summary": "Create a transaction category",
     "parameters": [
         {
@@ -47,7 +47,7 @@ def create_category():
 @categories_bp.route("/", methods=["GET"])
 @role_required('user')
 @swag_from({
-    "tags": ["transaction categories"],
+    "tags": ["Transaction Categories"],
     "summary": "Get all categories",
     "responses": {
         "200": {"description": "List of categories"}
@@ -67,7 +67,7 @@ def get_categories():
 @categories_bp.route("/<int:category_id>", methods=["PUT"])
 @role_required('user')
 @swag_from({
-    "tags": ["transaction categories"],
+    "tags": ["Transaction Categories"],
     "summary": "Update a transaction category",
     "parameters": [
         {"name": "category_id", "in": "path", "type": "integer", "required": True},
@@ -108,7 +108,7 @@ def update_category(category_id):
 @categories_bp.route("/<int:category_id>", methods=["DELETE"])
 @role_required('user')
 @swag_from({
-    "tags": ["transaction categories"],
+    "tags": ["Transaction Categories"],
     "summary": "Delete a transaction category",
     "parameters": [
         {"name": "category_id", "in": "path", "type": "integer", "required": True}

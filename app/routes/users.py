@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, abort
-from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, jwt_required
 from flasgger.utils import swag_from
 from pydantic import BaseModel, ValidationError
 from typing import Optional
@@ -27,7 +27,7 @@ class UserCreate(BaseModel):
 
 @users_bp.route("/", methods=["POST"])
 @swag_from({
-    "tags": ["users"],
+    "tags": ["Users"],
     "summary": "Register a new user",
     "description": "Creates a new user account.",
     "security": [],
@@ -129,7 +129,7 @@ def register_user():
 @users_bp.route("/", methods=["GET"])
 @role_required("admin")
 @swag_from({
-    "tags": ["users"],
+    "tags": ["Users"],
     'summary': 'List all users',
     'description': 'Retrieves all registered users in the system.',
     'responses': {
@@ -155,6 +155,7 @@ def list_users():
     
 @users_bp.route("/me", methods=["GET"])
 @swag_from({
+    'tags': ['Users'],
     'summary': 'Get user profile',
     'description': 'Retrieves the profile of the authenticated user.',
     'responses': {
@@ -162,7 +163,7 @@ def list_users():
         401: {'description': 'Unauthorized'}
     }
 })    
-    
+@jwt_required()    
 def get_profile():
     """Retrieves the profile of the currently authenticated user."""
     user_id = get_jwt_identity()
@@ -181,9 +182,10 @@ def get_profile():
         "phone_number": user.phone_number
     })
 
+
 @users_bp.route("/me", methods=["PUT"])
 @swag_from({
-    "tags": ["users"],
+    "tags": ["Users"],
     "summary": "Update user profile",
     "description": "Updates the profile information of the authenticated user.",
     "consumes": ["application/json"],
@@ -213,7 +215,7 @@ def get_profile():
         "404": {"description": "User not found"}
     }
 })
-
+@jwt_required()
 def update_profile():
     if not request.is_json:
         return jsonify({"detail": "Unsupported Media Type. Content-Type must be 'application/json'"}), 415
@@ -261,7 +263,7 @@ def update_profile():
 @users_bp.route("/<int:user_id>", methods=["DELETE"])
 @role_required("admin")
 @swag_from({
-    "tags": ["users"],
+    "tags": ["Users"],
     'summary': 'Delete a user',
     'description': 'Deletes a user from the system.',
     'parameters': [

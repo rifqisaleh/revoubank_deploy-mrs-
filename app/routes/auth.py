@@ -29,7 +29,7 @@ login_schema = {
 @auth_bp.route("/login", methods=["POST"])
 @limiter.limit("5 per minute")
 @swag_from({
-    "tags": ["auth"],
+    "tags": ["Auth"],
     "summary": "Login. Authenticate user and generate JWT token",
     "parameters": [
         {
@@ -160,7 +160,7 @@ def verify_email(token):
 
 @auth_bp.route("/logout", methods=["POST"])
 @swag_from({
-    "tags": ["auth"],
+    "tags": ["Auth"],
     "summary": "Logout (client-side only)",
     "description": "This route simply tells clients to delete the token. JWTs are stateless.",
     "responses": {
