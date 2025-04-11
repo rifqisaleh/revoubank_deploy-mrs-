@@ -106,29 +106,30 @@ Before using any protected endpoints in this API, authentication is **required**
 
 ### 1. Register a New User
 
-- Navigate to the `users` section.
-- Use the `POST /users/` endpoint to register a new user.
-- Example request body (feel free to edit as needed):
-
-```json
-{
-  "username": "your_username",
-  "email": "your_email@example.com",
-  "password": "your_secure_password"
-}
+```bash
+curl -X POST http://localhost:5000/users/   -H "Content-Type: application/json"   -d '{
+    "email": "<add_email>",
+    "full_name": "<add_full_name>",
+    "password": "<add_password>",
+    "phone_number": "<add_phone_number>",
+    "username": "<add_username>"
+  }'
 ```
+
+This will trigger a **mock verification email** in your terminal output (if `MOCK_EMAIL=True`).
+
 
 
 ### 2. Login to Obtain Token
 
-- Go to the `auth` section.
-- Use the `POST /token` endpoint with the registered username and password.
+```bash
+curl -X POST http://localhost:5000/login   -H "Content-Type: application/json"   -d '{
+    "username": "<add_username>",
+    "password": "<add_password>"
+  }'
+```
 
-
-
-### 3. Copy the Access Token
-
-- If login is successful (HTTP 200), the response will look like this:
+Successful login will return a token like:
 
 ```json
 {
@@ -137,111 +138,81 @@ Before using any protected endpoints in this API, authentication is **required**
 }
 ```
 
-- Copy the value of `access_token`.
 
+### 3. Authorize with the Token
 
+Once you have the access token, use it with your preferred tool:
 
-### 4. Authorize with the Token
+- **Swagger Docs** (`/docs`)  
+  → Click **Authorize** and paste: `Bearer <your_access_token>`
 
-- Scroll to the top-right corner of the Swagger page.
-- Click on the **Authorize** button.
-- Paste the token in the following format:
+- **Postman**  
+  → Set Authorization type to **Bearer Token** and paste the token
 
-```
-Bearer your.jwt.access.token.here
-```
+- **Curl**  
+  → Add header: `-H "Authorization: Bearer <your_access_token>"`
 
-- Click **Authorize** to apply the token to all secured endpoints.
+You’re now ready to hit all protected endpoints!
 
+<br>
 
-### 5. You're Ready!
+### Available Endpoints
 
-You can now access and test all authorized endpoints in the API.
+#### Users
 
-<br> <br>
+- `POST /users/`  
+  Register a new user.
 
+- `POST /login`  
+  Authenticate and receive a JWT token.
 
-## API Usage
+- `GET /users/`  
+  Retrieve a list of users (admin access required).
 
-### Authentication
-#### Register User
-**Endpoint:** `POST /auth/register`
+- `GET /users/<id>`  
+  Retrieve details of a specific user.
 
-**Request:**
-```json
-{
-  "email": "user@example.com",
-  "password": "securepassword"
-}
-```
+- `PUT /users/<id>`  
+  Update user information.
 
-**Response:**
-```json
-{
-  "message": "User registered successfully",
-  "user_id": 1
-}
-```
+- `DELETE /users/<id>`  
+  Delete a user (admin access required).
 
-#### Login
-**Endpoint:** `POST /auth/login`
+#### Accounts
 
-**Request:**
-```json
-{
-  "email": "user@example.com",
-  "password": "securepassword"
-}
-```
+- `GET /accounts/`  
+  Retrieve a list of accounts for the authenticated user.
 
-**Response:**
-```json
-{
-  "access_token": "jwt_token_here",
-  "token_type": "bearer"
-}
-```
+- `GET /accounts/<id>`  
+  Retrieve details of a specific account.
 
-### Account Management
-#### Create Bank Account
-**Endpoint:** `POST /accounts`
+- `POST /accounts/`  
+  Create a new account.
 
-**Request:**
-```json
-{
-  "account_type": "savings",
-  "initial_deposit": 1000.00
-}
-```
+- `PUT /accounts/<id>`  
+  Update account information.
 
-**Response:**
-```json
-{
-  "account_id": 1,
-  "balance": 1000.00
-}
-```
+- `DELETE /accounts/<id>`  
+  Delete an account.
 
-### Transactions
-#### Deposit Money
-**Endpoint:** `POST /transactions/deposit`
+#### Transactions
 
-**Request:**
-```json
-{
-  "account_id": 1,
-  "amount": 500.00
-}
-```
+- `GET /transactions/`  
+  Retrieve a list of transactions for the authenticated user.
 
-**Response:**
-```json
-{
-  "message": "Deposit successful",
-  "new_balance": 1500.00
-}
-```
-<br> <br>
+- `GET /transactions/<id>`  
+  Retrieve details of a specific transaction.
+
+- `POST /transactions/deposit`  
+  Deposit funds into an account.
+
+- `POST /transactions/withdraw`  
+  Withdraw funds from an account.
+
+- `POST /transactions/transfer`  
+  Transfer funds between accounts.
+
+  <br>
 
 ##  Testing Setup & Safety Notes
 
