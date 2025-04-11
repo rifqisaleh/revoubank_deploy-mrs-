@@ -16,6 +16,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.sql import text
+from unittest.mock import patch
 
 # Use in-memory SQLite for test database
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -162,3 +163,4 @@ def test_app(client):
 @pytest.fixture
 def test_client(client):
     return client
+

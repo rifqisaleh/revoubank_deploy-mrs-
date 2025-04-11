@@ -375,7 +375,7 @@ def check_balance():
 
 @transactions_bp.route('/<int:id>/check-balance', methods=['GET'])
 @swag_from({
-    "tags": ["Transactions"],
+    'tags': ['Transactions'],
     'summary': 'Check balance for a specific transaction',
     'description': 'Fetches the balance related to a specific transaction.',
     'parameters': [
